@@ -591,6 +591,7 @@ const whatsapp = {
       const name = contact.name || contact.subject;
       if (name) {
         state.waClient.contacts[contact.id] = name;
+        state.contacts[contact.id] = name;
       }
     }
   },

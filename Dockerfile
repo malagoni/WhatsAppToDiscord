@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM node:16-alpine
+FROM node:18-alpine
 WORKDIR /usr/local/WA2DC
 ENV WA2DC_TOKEN=CHANGE_THIS_TOKEN
 COPY . .
