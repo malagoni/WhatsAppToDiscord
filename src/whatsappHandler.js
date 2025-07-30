@@ -56,6 +56,16 @@ const connectToWhatsApp = async (retry = 1) => {
             // eslint-disable-next-line no-param-reassign
             retry = 1;
             await controlChannel.send('WhatsApp connection successfully opened!');
+
+            try {
+                const groups = await client.groupFetchAllParticipating();
+                for (const [jid, data] of Object.entries(groups)) {
+                    state.contacts[jid] = data.subject;
+                    client.contacts[jid] = data.subject;
+                }
+            } catch (err) {
+                state.logger?.error(err);
+            }
         }
     });
     client.ev.on('creds.update', saveState);
