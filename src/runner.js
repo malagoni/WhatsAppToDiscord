@@ -2,7 +2,7 @@ const { spawn } = require('child_process');
 const path = require('path');
 
 const INDEX_PATH = path.join(__dirname, 'index.js');
-const RESTART_DELAY = 5000; // ms
+const RESTART_DELAY = 10000; // ms
 
 let child;
 let shuttingDown = false;
