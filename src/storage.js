@@ -90,7 +90,7 @@ const setup = {
     return new Promise((resolve) => {
       const client = new Client({ intents: [Intents.FLAGS.GUILDS] });
       client.once('ready', () => {
-        console.log(`Invite the bot using the following link: https://discordapp.com/oauth2/authorize?client_id=${client.user.id}&scope=bot&permissions=536879120`);
+        state.logger?.info(`Invite the bot using the following link: https://discordapp.com/oauth2/authorize?client_id=${client.user.id}&scope=bot&permissions=536879120`);
       });
       client.once('guildCreate', async (guild) => {
         const category = await guild.channels.create('whatsapp', {
@@ -113,9 +113,9 @@ const setup = {
 
   async firstRun() {
     const settings = state.settings;
-    console.log('It seems like this is your first run.');
+    state.logger?.info('It seems like this is your first run.');
     if (process.env.WA2DC_TOKEN === "CHANGE_THIS_TOKEN") {
-      console.log("Please set WA2DC_TOKEN environment variable.");
+      state.logger?.info("Please set WA2DC_TOKEN environment variable.");
       process.exit();
     }
     const input = async (query) => {

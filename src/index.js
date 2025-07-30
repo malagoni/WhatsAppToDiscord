@@ -3,6 +3,7 @@ if (!globalThis.crypto) {
   globalThis.crypto = nodeCrypto.webcrypto;
 }
 const pino = require('pino');
+const pretty = require('pino-pretty');
 
 const discordHandler =  require('./discordHandler.js');
 const state =  require('./state.js');
@@ -12,7 +13,11 @@ const whatsappHandler =  require('./whatsappHandler.js');
 
 (async () => {
   const version = 'v0.10.30';
-  state.logger = pino({ mixin() { return { version }; } }, pino.destination('logs.txt'));
+  const streams = [
+    { stream: pino.destination('logs.txt') },
+    { stream: pretty({ colorize: true }) },
+  ];
+  state.logger = pino({ mixin() { return { version }; } }, pino.multistream(streams));
   let autoSaver = setInterval(() => storage.save(), 5 * 60 * 1000);
   ['SIGINT', 'SIGTERM', 'uncaughtException', 'unhandledRejection'].forEach((eventName) => {
     process.on(eventName, async (err) => {
@@ -68,5 +73,5 @@ const whatsappHandler =  require('./whatsappHandler.js');
   await whatsappHandler.start();
   state.logger.info('WhatsApp client started.');
 
-  console.log('Bot is now running. Press CTRL-C to exit.');
+  state.logger.info('Bot is now running. Press CTRL-C to exit.');
 })();

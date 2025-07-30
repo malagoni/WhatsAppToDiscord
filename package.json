@@ -18,6 +18,7 @@
     "@whiskeysockets/baileys": "^6.7.18",
     "discord.js": "^13.16.0",
     "pino": "^8.14.1",
+    "pino-pretty": "^13.1.1",
     "qrcode": "^1.5.3"
   },
   "devDependencies": {

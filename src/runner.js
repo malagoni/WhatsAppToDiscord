@@ -1,5 +1,12 @@
 const { spawn } = require('child_process');
 const path = require('path');
+const pino = require('pino');
+const pretty = require('pino-pretty');
+
+const logger = pino({}, pino.multistream([
+  { stream: pino.destination('logs.txt') },
+  { stream: pretty({ colorize: true }) },
+]));
 
 const INDEX_PATH = path.join(__dirname, 'index.js');
 const RESTART_DELAY = 10000; // ms
@@ -16,7 +23,7 @@ function start() {
     }
 
     if (code !== 0) {
-      console.log(`Bot exited unexpectedly with code ${code ?? signal}. Restarting in ${RESTART_DELAY / 1000}s...`);
+      logger.error(`Bot exited unexpectedly with code ${code ?? signal}. Restarting in ${RESTART_DELAY / 1000}s...`);
       setTimeout(start, RESTART_DELAY);
     } else {
       process.exit(0);
