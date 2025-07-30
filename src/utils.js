@@ -86,7 +86,7 @@ const updater = {
   async downloadSignature(defaultExeName) {
     const signature = await requests.fetchBuffer(`https://github.com/FKLC/WhatsAppToDiscord/releases/latest/download/${defaultExeName}.sig`);
     if ('error' in signature) {
-      console.log("Couldn't fetch the signature of the update.");
+      state.logger?.error("Couldn't fetch the signature of the update.");
       return false;
     }
     return signature;
@@ -105,20 +105,20 @@ const updater = {
     const currExeName = this.currentExeName;
     const defaultExeName = this.defaultExeName;
     if (!defaultExeName) {
-      console.log(`Auto-update is not supported on this platform: ${os.platform()}`);
+      state.logger?.info(`Auto-update is not supported on this platform: ${os.platform()}`);
       return false;
     }
 
     await this.renameOldVersion();
     const downloadStatus = await this.downloadLatestVersion(defaultExeName, currExeName);
     if (!downloadStatus) {
-      console.log('Download failed! Skipping update.');
+      state.logger?.error('Download failed! Skipping update.');
       return false;
     }
 
     const signature = await this.downloadSignature(defaultExeName);
     if (signature && !this.validateSignature(signature.result, currExeName)) {
-      console.log("Couldn't verify the signature of the updated binary, reverting back. Please update manually.");
+      state.logger?.error("Couldn't verify the signature of the updated binary, reverting back. Please update manually.");
       this.revertChanges();
       return false;
     }
@@ -131,24 +131,24 @@ const updater = {
       process.argv.some((arg) => ['--skip-update', '-su'].includes(arg)) ||
       process.env.WA2DC_SKIP_UPDATE === '1'
     ) {
-      console.log('Skipping update due to configuration.');
+      state.logger?.info('Skipping update due to configuration.');
       return;
     }
 
     if (this.isNode) {
-      console.log('Running script with node. Skipping auto-update.');
+      state.logger?.info('Running script with node. Skipping auto-update.');
       return;
     }
 
     if (!process.stdin.isTTY) {
-      console.log('Skipping auto-update due to non-interactive environment.');
+      state.logger?.info('Skipping auto-update due to non-interactive environment.');
       return;
     }
 
     this.cleanOldVersion();
     const newVer = await this.fetchLatestVersion();
     if (newVer === null) {
-      console.log('Something went wrong with auto-update.');
+      state.logger?.error('Something went wrong with auto-update.');
       return;
     }
 
@@ -158,11 +158,11 @@ const updater = {
 
     const prompt = (await ui.input(`A new version is available ${currVer} -> ${newVer.version}. Changelog: ${newVer.changes}\nDo you want to update? (Y/N) `)).toLowerCase();
     if (prompt !== 'y') {
-      console.log('Skipping update.');
+      state.logger?.info('Skipping update.');
       return;
     }
 
-    console.log('Please wait as the bot downloads the new version.');
+    state.logger?.info('Please wait as the bot downloads the new version.');
     const exeName = await updater.update();
     if (exeName) {
       await ui.input(`Updated WA2DC. Hit enter to exit and run ${this.currentExeName}.`);
@@ -224,7 +224,7 @@ const sqliteToJson = {
   async downloadSignature(defaultExeName) {
     const signature = await requests.fetchBuffer(`https://github.com/FKLC/sqlite-to-json/releases/latest/download/${defaultExeName}.sig`);
     if ('error' in signature) {
-      console.log("Couldn't fetch the signature of the update.");
+      state.logger?.error("Couldn't fetch the signature of the update.");
       return false;
     }
     return signature;
@@ -239,19 +239,19 @@ const sqliteToJson = {
   async downloadAndVerify() {
     const exeName = this.defaultExeName;
     if (exeName == '') {
-      console.log(`Automatic conversion of database is not supported on this platform and arch ${os.platform()}/${process.arch}. Please convert database manually`);
+      state.logger?.error(`Automatic conversion of database is not supported on this platform and arch ${os.platform()}/${process.arch}. Please convert database manually`);
       return false;
     }
 
     const downloadStatus = await this.downloadLatestVersion(exeName);
     if (!downloadStatus) {
-      console.log('Download failed! Please convert database manually.');
+      state.logger?.error('Download failed! Please convert database manually.');
       return false;
     }
 
     const signature = await this.downloadSignature(exeName);
     if (signature && !updater.validateSignature(signature.result, exeName)) {
-      console.log("Couldn't verify the signature of the database converter. Please convert database manually");
+      state.logger?.error("Couldn't verify the signature of the database converter. Please convert database manually");
       fs.unlinkSync(exeName);
       return false;
     }
