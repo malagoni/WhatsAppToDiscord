@@ -14,15 +14,18 @@ const whatsappHandler =  require('./whatsappHandler.js');
   const version = 'v0.10.30';
   state.logger = pino({ mixin() { return { version }; } }, pino.destination('logs.txt'));
   let autoSaver = setInterval(() => storage.save(), 5 * 60 * 1000);
-  ['SIGINT', 'uncaughtException', 'SIGTERM'].forEach((eventName) => process.on(eventName, async (err) => {
-    clearInterval(autoSaver);
-    state.logger.error(err);
-    state.logger.info('Exiting!');
-    if (['SIGINT', 'SIGTERM'].includes(err)) {
-      await storage.save();
-    }
-    process.exit();
-  }));
+  ['SIGINT', 'SIGTERM', 'uncaughtException', 'unhandledRejection'].forEach((eventName) => {
+    process.on(eventName, async (err) => {
+      clearInterval(autoSaver);
+      state.logger.error(err);
+      state.logger.info('Exiting!');
+      if (['SIGINT', 'SIGTERM'].includes(eventName)) {
+        await storage.save();
+        process.exit(0);
+      }
+      process.exit(1);
+    });
+  });
 
   state.logger.info('Starting');
 
