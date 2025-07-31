@@ -50,15 +50,15 @@ When disabled (enabled by default), the files received from Discord will be sent
 - Format: `disableWAUpload`
 
 ## setDCPrefix
-When set (your username by default), the prefix will be added to messages sent to WhatsApp from Discord.
+When set (your username by default), the prefix will be added in bold followed by a newline to messages sent to WhatsApp from Discord.
 - Format: `setDCPrefix`
 
 ## enableDCPrefix
-When enabled (disabled by default), your Discord username will be added to messages sent to WhatsApp from Discord.
+When enabled (disabled by default), your Discord username will be added in bold followed by a newline to messages sent to WhatsApp from Discord.
 - Format: `enableDCPrefix`
 
 ## disableDCPrefix
-When disabled (disabled by default), your Discord username won't be added to messages sent to WhatsApp from Discord.
+When disabled (disabled by default), your Discord username won't be added in bold followed by a newline to messages sent to WhatsApp from Discord.
 - Format: `disableDCPrefix`
 
 ## enableWAPrefix

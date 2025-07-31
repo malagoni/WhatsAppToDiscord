@@ -191,7 +191,8 @@ const connectToWhatsApp = async (retry = 1) => {
         }
 
         if (state.settings.DiscordPrefix) {
-            content.text = `[${state.settings.DiscordPrefixText || message.member?.nickname || message.author.username}] ${content.text}`;
+            const prefix = state.settings.DiscordPrefixText || message.member?.nickname || message.author.username;
+            content.text = `*${prefix}*\n${content.text}`;
         }
 
         if (message.reference) {
@@ -223,10 +224,16 @@ const connectToWhatsApp = async (retry = 1) => {
             key.participant = utils.whatsapp.toJid(message.author.username);
         }
 
+        let text = message.content;
+        if (state.settings.DiscordPrefix) {
+            const prefix = state.settings.DiscordPrefixText || message.member?.nickname || message.author.username;
+            text = `*${prefix}*\n${text}`;
+        }
+
         const editMsg = await client.sendMessage(
             jid,
             {
-                text: message.content,
+                text,
                 edit: key,
             }
         );
