@@ -550,7 +550,8 @@ const whatsapp = {
     else if ('documentMessage' === msgType) {
       return msg.fileName;
     }
-    return `${msgType}.${msg.mimetype.split('/')[1]}`;
+    const ext = msg.mimetype?.split('/')?.[1] || 'bin';
+    return `${msgType}.${ext}`;
   },
   async getFile(rawMsg, msgType) {
     const [nMsgType, msg] = this.getMessage(rawMsg, msgType);
@@ -627,11 +628,11 @@ const whatsapp = {
     }
   },
   createDocumentContent(attachment) {
-    let contentType = attachment.contentType.split('/')[0];
+    let contentType = attachment.contentType?.split('/')?.[0] || 'application';
     contentType = ['image', 'video', 'audio'].includes(contentType) ? contentType : 'document';
     const documentContent = {};
     if (contentType === 'document') {
-      documentContent['mimetype'] = attachment.contentType.split(';')[0];
+      documentContent['mimetype'] = attachment.contentType?.split(';')?.[0] || 'application/octet-stream';
     }
     documentContent[contentType] = { url: attachment.url };
     if (contentType === 'document') {
