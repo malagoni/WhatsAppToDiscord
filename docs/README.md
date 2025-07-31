@@ -14,6 +14,13 @@ Originally created by [Fatih Kilic](https://github.com/FKLC), now maintained by 
 - Self Hosted, so your data never leaves your computer
 - Automatically restarts itself if it crashes
 
+### Running
+
+Start the bot with `npm start` or run the executable from the releases page. The
+start script keeps an eye on the process and brings it back up if it crashes.
+Launching `node src/index.js` directly skips this behaviour, so crashes will
+stop the bot.
+
 ### Setup
 
 The setup is short, but challenging for some. So, we explained every steps in detail for your convenience, just [click here](setup.md) to get started.
