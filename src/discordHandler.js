@@ -40,11 +40,11 @@ client.on('whatsappMessage', async (message) => {
   if (message.isGroup && state.settings.WAGroupPrefix) { msgContent += `[${message.name}] `; }
 
   if (message.isForwarded) {
-    msgContent += `forwarded message:\n${message.content.split('\n').join('\n> ')}`;
+    msgContent += `forwarded message:\n${(message.content || '').split('\n').join('\n> ')}`;
   }
   else if (message.quote) {
     const qContent = (message.quote.content || '').split('\n').join('\n> ');
-    msgContent += `> ${message.quote.name}: ${qContent}\n${message.content}`;
+    msgContent += `> ${message.quote.name}: ${qContent}\n${message.content || ''}`;
     if (message.quote.file) {
       if (message.quote.file.largeFile && state.settings.LocalDownloads) {
         msgContent += await utils.discord.downloadLargeFile(message.quote.file);
