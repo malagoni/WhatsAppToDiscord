@@ -578,7 +578,9 @@ const whatsapp = {
     return 0;
   },
   sentAfterStart(rawMsg) {
-    return this.getTimestamp(rawMsg) > state.startTime;
+    const ts = this.getTimestamp(rawMsg);
+    const id = rawMsg?.key?.id;
+    return ts > state.startTime || !Object.prototype.hasOwnProperty.call(state.lastMessages, id);
   },
   getMessageType(rawMsg) {
     return ['conversation', 'extendedTextMessage', 'imageMessage', 'videoMessage', 'audioMessage', 'documentMessage', 'documentWithCaptionMessage', 'viewOnceMessageV2', 'stickerMessage', 'editedMessage'].find((el) => Object.hasOwn(rawMsg.message || {}, el));
