@@ -347,6 +347,24 @@ const commands = {
     state.settings.redirectWebhooks = params[0] === "yes";
     await controlChannel.send(`Redirecting webhooks is set to ${state.settings.redirectWebhooks}.`);
   },
+  async update() {
+    if (!state.updateInfo) {
+      await controlChannel.send('No update available.');
+      return;
+    }
+    await controlChannel.send('Updating...');
+    const success = await utils.updater.update();
+    if (success) {
+      await controlChannel.send('Update downloaded. Restarting...');
+      process.exit();
+    } else {
+      await controlChannel.send('Update failed. Check logs.');
+    }
+  },
+  async skipupdate() {
+    state.updateInfo = null;
+    await controlChannel.send('Update skipped.');
+  },
   async unknownCommand(message) {
     await controlChannel.send(`Unknown command: \`${message.content}\`\nType \`help\` to see available commands`);
   },

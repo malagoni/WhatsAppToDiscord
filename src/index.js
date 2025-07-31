@@ -34,9 +34,6 @@ const whatsappHandler =  require('./whatsappHandler.js');
 
   state.logger.info('Starting');
 
-  await utils.updater.run(version);
-  state.logger.info('Update checked.');
-
   const conversion = await utils.sqliteToJson.convert();
   if (!conversion) {
     state.logger.error('Conversion failed!');
@@ -72,6 +69,18 @@ const whatsappHandler =  require('./whatsappHandler.js');
 
   await whatsappHandler.start();
   state.logger.info('WhatsApp client started.');
+
+  await utils.updater.run(version, { prompt: false });
+  state.logger.info('Update checked.');
+
+  if (state.updateInfo) {
+    const ctrl = await utils.discord.getControlChannel();
+    await ctrl?.send(
+      `A new version is available ${state.updateInfo.currVer} -> ${state.updateInfo.version}.\n` +
+      `See ${state.updateInfo.url}\n` +
+      `Changelog: ${state.updateInfo.changes}\nType \`update\` to apply or \`skipUpdate\` to ignore.`
+    );
+  }
 
   state.logger.info('Bot is now running. Press CTRL-C to exit.');
 })();

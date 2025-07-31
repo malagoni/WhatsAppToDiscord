@@ -41,6 +41,7 @@ const updater = {
       return {
         version: response.result.tag_name,
         changes: response.result.body,
+        url: response.result.html_url,
       };
     }
     state.logger.error("Tag name wasn't in result");
@@ -126,7 +127,7 @@ const updater = {
     return true;
   },
 
-  async run(currVer) {
+  async run(currVer, { prompt = process.stdin.isTTY } = {}) {
     if (
       process.argv.some((arg) => ['--skip-update', '-su'].includes(arg)) ||
       process.env.WA2DC_SKIP_UPDATE === '1'
@@ -137,11 +138,6 @@ const updater = {
 
     if (this.isNode) {
       state.logger?.info('Running script with node. Skipping auto-update.');
-      return;
-    }
-
-    if (!process.stdin.isTTY) {
-      state.logger?.info('Skipping auto-update due to non-interactive environment.');
       return;
     }
 
@@ -156,8 +152,13 @@ const updater = {
       return;
     }
 
-    const prompt = (await ui.input(`A new version is available ${currVer} -> ${newVer.version}. Changelog: ${newVer.changes}\nDo you want to update? (Y/N) `)).toLowerCase();
-    if (prompt !== 'y') {
+    if (!prompt) {
+      state.updateInfo = { currVer, ...newVer };
+      return;
+    }
+
+    const answer = (await ui.input(`A new version is available ${currVer} -> ${newVer.version}. Changelog: ${newVer.changes}\nDo you want to update? (Y/N) `)).toLowerCase();
+    if (answer !== 'y') {
       state.logger?.info('Skipping update.');
       return;
     }
