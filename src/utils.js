@@ -501,7 +501,10 @@ const whatsapp = {
   isQuoted(msg) {
     return msg.contextInfo?.quotedMessage;
   },
-  async getQuote(msg) {
+  async getQuote(rawMsg) {
+    const msgType = this.getMessageType(rawMsg);
+    const [, msg] = this.getMessage(rawMsg, msgType);
+
     if (!this.isQuoted(msg)) return null;
 
     const qMsg = msg.contextInfo.quotedMessage;
@@ -509,7 +512,16 @@ const whatsapp = {
 
     const [nMsgType, message] = this.getMessage({ message: qMsg }, qMsgType);
     const content = this.getContent(message, nMsgType, qMsgType);
-    const file = await this.getFile({ message: qMsg }, qMsgType);
+    const downloadCtx = {
+      key: {
+        remoteJid: rawMsg.key.remoteJid,
+        id: msg.contextInfo.stanzaId,
+        fromMe: rawMsg.key.fromMe,
+        participant: msg.contextInfo.participant,
+      },
+      message: qMsg,
+    };
+    const file = await this.getFile(downloadCtx, qMsgType);
 
     return {
       name: this.jidToName(msg.contextInfo.participant || ''),
