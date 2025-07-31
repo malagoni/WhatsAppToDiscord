@@ -38,8 +38,8 @@ Removes the given channel from the whitelist.
     - `removeFromWhitelist #john-doe`: This would remove John Doe from the whitelist, preventing them to send you a message if you have whitelist enabled.
 
 ## resync
-Re-syncs your contacts and groups, and renames channels. Can be used when the bot can't find your desired contact or group.
-- Format: `resync`
+Re-syncs your contacts and groups. Can optionally rename the Discord channels to match WhatsApp names.
+- Format: `resync [rename]`
 
 ## enableWAUpload
 When enabled (enabled by default), the files received from Discord will be uploaded to WhatsApp, instead of providing a link to the attachment. File uploads takes longer and consumes more data.

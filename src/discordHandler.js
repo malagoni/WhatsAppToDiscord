@@ -15,7 +15,7 @@ const client = new Client({
 let controlChannel;
 
 const setControlChannel = async () => {
-  controlChannel = await client.channels.fetch(state.settings.ControlChannelID).catch(() => null);
+  controlChannel = await utils.discord.getControlChannel();
 };
 
 client.on('ready', async () => {
@@ -23,10 +23,14 @@ client.on('ready', async () => {
 });
 
 client.on('channelDelete', async (channel) => {
-  const jid = utils.discord.channelIdToJid(channel.id);
-  delete state.chats[jid];
-  delete state.goccRuns[jid];
-  state.settings.Categories = state.settings.Categories.filter((id) => channel.id !== id);
+  if (channel.id === state.settings.ControlChannelID) {
+    controlChannel = await utils.discord.getControlChannel();
+  } else {
+    const jid = utils.discord.channelIdToJid(channel.id);
+    delete state.chats[jid];
+    delete state.goccRuns[jid];
+    state.settings.Categories = state.settings.Categories.filter((id) => channel.id !== id);
+  }
 });
 
 client.on('whatsappMessage', async (message) => {
@@ -267,13 +271,15 @@ const commands = {
   async help() {
     await controlChannel.send('See all the available commands at https://arespawn.github.io/WhatsAppToDiscord/#/commands');
   },
-  async resync() {
+  async resync(_message, params) {
     await state.waClient.authState.keys.set({
       'app-state-sync-version': { critical_unblock_low: null },
     });
     await state.waClient.resyncAppState(['critical_unblock_low']);
     for (const [jid, attributes] of Object.entries(await state.waClient.groupFetchAllParticipating())) { state.waClient.contacts[jid] = attributes.subject; }
-    await utils.discord.renameChannels();
+    if (params.includes('rename')) {
+      await utils.discord.renameChannels();
+    }
     await controlChannel.send('Re-synced!');
   },
   async enablelocaldownloads() {
