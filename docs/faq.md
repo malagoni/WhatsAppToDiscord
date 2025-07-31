@@ -36,7 +36,7 @@ There are 3 options you can use.
 No. The WhatsApp Web protocol used by the bot does not expose the real-time audio or video streams of a call. Incoming and missed calls are only sent as notifications to Discord, so the bot cannot relay or receive live WhatsApp calls.
 
 ## Is it possible to run on Docker?
-It is actually possible to run this bot in Docker. You just have to set your Discord token as an environment variable named WA2DC_TOKEN, and run Dockerfile in the repo.
+Yes. You can build the image manually or use the provided `docker-compose.yml`. Copy `.env.example` to `.env`, set your Discord token inside and run `docker compose up -d` to start the container.
 
 ## How to build an executable of the program
 The bot is built publicly on [GitHub actions](https://github.com/arespawn/WhatsAppToDiscord/actions), but here's a walkthrough of the whole process.

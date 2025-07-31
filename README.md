@@ -28,6 +28,11 @@ page. Both methods use a small helper script that watches the process and
 restarts it automatically if it exits unexpectedly. Directly running
 `node src/index.js` will skip this helper and the bot won't restart on crashes.
 
+Alternatively, you can run the bot using `docker-compose`. Copy `.env.example`
+to `.env`, put your Discord bot token in it and execute `docker compose up -d`.
+The compose file mounts the `storage` directory so data is kept between
+container restarts.
+
 ---
 
 ### For setup and commands, check out the [documentation](https://arespawn.github.io/WhatsAppToDiscord/)!
