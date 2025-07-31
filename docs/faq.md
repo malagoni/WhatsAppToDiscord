@@ -1,5 +1,5 @@
 # Frequently Asked Questions
-Here you will find frequently asked questions on [GitHub issues](https://github.com/FKLC/WhatsAppToDiscord/issues)
+Here you will find frequently asked questions on [GitHub issues](https://github.com/arespawn/WhatsAppToDiscord/issues)
 
 ## What is a whitelist?
 A whitelist allows you to receive messages only from the conversations that are on the list. A blacklist would do the opposite, but WhatsApp already has that feature called blocking.
@@ -8,7 +8,7 @@ A whitelist allows you to receive messages only from the conversations that are 
 You can do whatever you want with the bot. Just make sure that you get the permissions right. You can enable Discord prefix and whitelist your school's/institution's WhatsApp group, basically creating a bridge between two platforms. Also, make sure that you restrict public access to `#control-room` so that people won't mess with the whitelist.
 
 ## Flagged as a virus
-The bot is completely open-source, even the compilation is done publicly using [GitHub Actions](https://github.com/FKLC/WhatsAppToDiscord/actions/workflows/new-release-v2.yml). Is it possible for me to replace the binaries? Technically yes, but that would be a really bad reputation. I believe the main reason the bot gets flagged as a virus is the download count. This project is quite small, and it doesn't get many downloads. Microsoft SmartScreen also tries to deter users from running executables from unknown developers. A code signing certificate would probably help, but they are quite pricey and are not worth for an open-source project in my opinion. If you want to make sure nothing shady happens, you can simply clone the repo and compile/run your own version after inspecting the code.
+The bot is completely open-source, even the compilation is done publicly using [GitHub Actions](https://github.com/arespawn/WhatsAppToDiscord/actions). Is it possible for me to replace the binaries? Technically yes, but that would be a really bad reputation. I believe the main reason the bot gets flagged as a virus is the download count. This project is quite small, and it doesn't get many downloads. Microsoft SmartScreen also tries to deter users from running executables from unknown developers. A code signing certificate would probably help, but they are quite pricey and are not worth for an open-source project in my opinion. If you want to make sure nothing shady happens, you can simply clone the repo and compile/run your own version after inspecting the code.
 
 ## Negative or sky-high ping
 This is due to the time difference between Discords' servers and your computer. As the ping is measured in milliseconds, even small differences can produce a huge/weird number. This can be fixed, but just syncing the time is an easier solution.
@@ -36,11 +36,11 @@ There are 3 options you can use.
 It is actually possible to run this bot in Docker. You just have to set your Discord token as an environment variable named WA2DC_TOKEN, and run Dockerfile in the repo.
 
 ## How to build an executable of the program
-The bot is built publicly on [GitHub actions](https://github.com/FKLC/WhatsAppToDiscord/actions/workflows/new-release-v2.yml), but here's a walkthrough of the whole process.
+The bot is built publicly on [GitHub actions](https://github.com/arespawn/WhatsAppToDiscord/actions), but here's a walkthrough of the whole process.
 1. Install Node and NPM [here](https://nodejs.org/en/download).
 1. Install Git [here](https://git-scm.com/downloads)
 1. Execute the following commands to clone and enter bot's folder:
-    1. `git clone https://github.com/FKLC/WhatsAppToDiscord.git`
+    1. `git clone https://github.com/arespawn/WhatsAppToDiscord.git`
     1. `cd WhatsAppToDiscord` 
 1. Run `npm i` to install dependencies
 1. Run `./node_modules/.bin/esbuild ./src/index.js --bundle --platform=node --external:sharp --external:qrcode-terminal --external:jimp --external:link-preview-js --target=node18 --outfile=out.js` to create a single JS file

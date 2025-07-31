@@ -32,7 +32,7 @@ const updater = {
   },
 
   async fetchLatestVersion() {
-    const response = await requests.fetchJson('https://api.github.com/repos/FKLC/WhatsAppToDiscord/releases/latest');
+    const response = await requests.fetchJson('https://api.github.com/repos/arespawn/WhatsAppToDiscord/releases/latest');
     if ('error' in response) {
       state.logger.error(response.error);
       return null;
@@ -80,11 +80,11 @@ const updater = {
   },
 
   async downloadLatestVersion(defaultExeName, name) {
-    return requests.downloadFile(name, `https://github.com/FKLC/WhatsAppToDiscord/releases/latest/download/${defaultExeName}`);
+    return requests.downloadFile(name, `https://github.com/arespawn/WhatsAppToDiscord/releases/latest/download/${defaultExeName}`);
   },
 
   async downloadSignature(defaultExeName) {
-    const signature = await requests.fetchBuffer(`https://github.com/FKLC/WhatsAppToDiscord/releases/latest/download/${defaultExeName}.sig`);
+    const signature = await requests.fetchBuffer(`https://github.com/arespawn/WhatsAppToDiscord/releases/latest/download/${defaultExeName}.sig`);
     if ('error' in signature) {
       state.logger?.error("Couldn't fetch the signature of the update.");
       return false;
@@ -171,13 +171,18 @@ const updater = {
   },
 
   publicKey: '-----BEGIN PUBLIC KEY-----\n'
-    + 'MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEArwZEUsgdgeAmr5whnpsO\n'
-    + 'hvdp222eepTpxp23GmrOdXHnSDitSaU8St9ViKDUOlEWOx+61Y3DpBetycgFcawz\n'
-    + 'bKFxm2UNwMqW/8sg/cvh8BGJ2IGor8etC6KRUclDLvtzCl8j95S9tIzBBheVRLx9\n'
-    + '+RtLNyzZBzn9GTZXdlO368u34fHrCYwoEFJfTXbEb2LnlbMGyjo4C/We6xWmRVEz\n'
-    + 'XoygOglAgJYuQjpCfjUhfcP/bOh/mLOgpX0kuJzp/0dSMx4qvJhBPe7fGXesGJQ9\n'
-    + 'x+cgcRR8fzN9gowrhltAb73PFYECiOYFYQS8bHMJX/jcQiYKqUuQCWS/wcbkYz+s\n'
-    + 'OwIDAQAB\n'
+    + 'MIICIjANBgkqhkiG9w0BAQEFAAOCAg8AMIICCgKCAgEA9Vu9wa838q/QI6WDxroy\n'
+    + 'HEGDaZelRrI1GUxxLAoBcU0RTIxqIWTI7DC04DIYbuukpEokBhHZTQMknY7mjONk\n'
+    + 'M1GftYPdZGoKMOUL4F0K7jV4axS8dNze81IbS8hkG4UwQTn8z0bQQF6/v+qd/tbG\n'
+    + 'ECH2OVpbU9jKBOSr3YviN8f1RNpJVmcgOPd5W8SFhN4ImVUtWtRXN6Nwv6EbYvKV\n'
+    + 'nZAbREwYV7wvgZlJZka9onMtER0Ac1tYLK1Syf29Lp+zMWOAjMOHBzmT/MhePmtS\n'
+    + 'TqZVOpMo2OQzO9LuHv3sh06L6qCSOCEqImnq1/hHnklnmn/HMVCXnF537Ejggtlt\n'
+    + 'BVdXGz+qNh88p0NfGqRP2d4JZ+doGA4pxLE9cJp6/429d4osrAisGywF1Z1R1Tt7\n'
+    + 'SAYeeFyn8glp1+9lcb5f+S2HglGafrnxIwyujH269FrZ8d2oYIhfspkZjtB5is99\n'
+    + 'aR9HnXMbXuZw+uGJUsDQoDzxJN0tvvnJ5HcuK8NAxBfczY2q93mW2i1x+CHS+x+g\n'
+    + 'T9+NOegwshfnYnHBkiz/cqEgMQNZnhacOnTi29zLxHRsREWi143ZPogZJ3uS8GX7\n'
+    + 'PYgM2agSkkVbEkSwij2n56fRA1jo+l5833mtKU1HWGufptC3bErKvfH22JwE1q4q\n'
+    + 'CDO3JpgAt8wj2RU7n2MOPMkCAwEAAQ==\n'
     + '-----END PUBLIC KEY-----',
 };
 
@@ -218,11 +223,11 @@ const sqliteToJson = {
   },
 
   async downloadLatestVersion(defaultExeName) {
-    return requests.downloadFile(defaultExeName, `https://github.com/FKLC/sqlite-to-json/releases/latest/download/${defaultExeName}`);
+    return requests.downloadFile(defaultExeName, `https://github.com/arespawn/sqlite-to-json/releases/latest/download/${defaultExeName}`);
   },
 
   async downloadSignature(defaultExeName) {
-    const signature = await requests.fetchBuffer(`https://github.com/FKLC/sqlite-to-json/releases/latest/download/${defaultExeName}.sig`);
+    const signature = await requests.fetchBuffer(`https://github.com/arespawn/sqlite-to-json/releases/latest/download/${defaultExeName}.sig`);
     if ('error' in signature) {
       state.logger?.error("Couldn't fetch the signature of the update.");
       return false;

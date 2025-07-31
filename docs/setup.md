@@ -1,7 +1,7 @@
 # Setup Steps
 Please don't get worried about the number of steps listed here. We wanted to be as detailed as possible :)
 
-1. Go to the [download page](https://github.com/FKLC/WhatsAppToDiscord/releases/latest) and download the version that is right for your computer.
+1. Go to the [download page](https://github.com/arespawn/WhatsAppToDiscord/releases/latest) and download the version that is right for your computer.
 <details>
   <summary>Show photo</summary>
   <img src="_media/1.jpg" alt="Image showing which version to download" />
