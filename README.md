@@ -19,6 +19,8 @@ Originally created by [Fatih Kilic](https://github.com/FKLC), the project is now
 - Automatically restarts itself if it crashes
 - Restarts automatically after applying updates and checks for new versions every couple of days
 
+**Note:** Due to limitations of the WhatsApp Web protocol, the bot can only notify you of incoming or missed calls. It cannot forward the audio or video streams of a WhatsApp call to Discord.
+
 ### Running
 
 Run the bot with `npm start` or use the executable downloaded from the releases

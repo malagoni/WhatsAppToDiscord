@@ -32,6 +32,9 @@ There are 3 options you can use.
     1. Using [@eibrahim95's extension](https://chrome.google.com/webstore/detail/discord-voice-messages/emfegmjcadbmdcmdecepfkmhnenpnfip) and chaning file names, making their extensions *"mp3"* instead of *"wav"*.
     2. Using [@magadan's extension](https://github.com/magadan/discord-voice-messages-mp3). This is a modified version [@eibrahim95's extension](https://chrome.google.com/webstore/detail/discord-voice-messages/emfegmjcadbmdcmdecepfkmhnenpnfip). It creates *"mp3"* files automatically instead of *"wav"* files, so you don't have to modify the file name every time. However, its setup is a bit longer. You have to build and install the extension using the readme file.
 
+## Can I bridge WhatsApp calls to Discord?
+No. The WhatsApp Web protocol used by the bot does not expose the real-time audio or video streams of a call. Incoming and missed calls are only sent as notifications to Discord, so the bot cannot relay or receive live WhatsApp calls.
+
 ## Is it possible to run on Docker?
 It is actually possible to run this bot in Docker. You just have to set your Discord token as an environment variable named WA2DC_TOKEN, and run Dockerfile in the repo.
 
