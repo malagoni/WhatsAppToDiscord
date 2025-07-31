@@ -422,14 +422,27 @@ const discord = {
     const guild = await this.getGuild();
 
     for (const [jid, webhook] of Object.entries(state.chats)) {
-      const channel = await guild.channels.fetch(webhook.channelId);
-      await channel.edit({
-        name: whatsapp.jidToName(jid),
-      });
+      try {
+        const channel = await guild.channels.fetch(webhook.channelId);
+        await channel.edit({
+          name: whatsapp.jidToName(jid),
+        });
+      } catch (err) {
+        state.logger?.error(err);
+      }
     }
   },
   async getControlChannel() {
-    return this.getChannel(state.settings.ControlChannelID);
+    let channel = await this.getChannel(state.settings.ControlChannelID);
+    if (!channel) {
+      channel = await this.createChannel('control-room');
+      state.settings.ControlChannelID = channel.id;
+      await channel.edit({
+        position: 0,
+        parent: await this.getCategory(0),
+      });
+    }
+    return channel;
   },
   async findAvailableName(dir, fileName) {
     let absPath;
