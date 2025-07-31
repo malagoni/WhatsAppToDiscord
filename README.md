@@ -2,7 +2,7 @@
 
 WhatsAppToDiscord is a Discord bot that uses WhatsApp Web as a bridge between Discord and WhatsApp. It is built on top of [discord.js](https://github.com/discordjs/discord.js) and [Baileys](https://github.com/WhiskeySockets/Baileys) libraries.
 
-Originally created by [Fatih Kilic](https://github.com/FKLC), the project is now maintained by [Arespawn](https://github.com/arespawn) with the blessing of the previous author.
+Originally created by [Fatih Kilic](https://github.com/FKLC), the project is now maintained by [arespawn](https://github.com/arespawn) with the blessing of the previous author.
 
 ### Requirements
 
