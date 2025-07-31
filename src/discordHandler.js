@@ -2,6 +2,7 @@ const { Client, Intents } = require('discord.js');
 
 const state = require('./state.js');
 const utils = require('./utils.js');
+const fs = require('fs');
 
 const client = new Client({
   intents: [
@@ -366,9 +367,22 @@ const commands = {
     const success = await utils.updater.update();
     if (success) {
       await controlChannel.send('Update downloaded. Restarting...');
+      await fs.promises.writeFile('restart.flag', '');
       process.exit();
     } else {
       await controlChannel.send('Update failed. Check logs.');
+    }
+  },
+  async checkupdate() {
+    await utils.updater.run(state.version, { prompt: false });
+    if (state.updateInfo) {
+      await controlChannel.send(
+        `A new version is available ${state.updateInfo.currVer} -> ${state.updateInfo.version}.\n` +
+        `See ${state.updateInfo.url}\n` +
+        `Changelog: ${state.updateInfo.changes}\nType \`update\` to apply or \`skipUpdate\` to ignore.`
+      );
+    } else {
+      await controlChannel.send('No update available.');
     }
   },
   async skipupdate() {

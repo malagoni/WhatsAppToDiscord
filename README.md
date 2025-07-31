@@ -17,6 +17,7 @@ Originally created by [Fatih Kilic](https://github.com/FKLC), the project is now
 - Open Source, you can see, modify and run your own version of the bot!
 - Self Hosted, so your data never leaves your computer
 - Automatically restarts itself if it crashes
+- Restarts automatically after applying updates and checks for new versions every couple of days
 
 ### Running
 

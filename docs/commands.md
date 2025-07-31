@@ -149,6 +149,10 @@ Replies back with *"Pong <Now - Time Message Sent>"ms*. It basically shows the b
 Downloads and installs the latest version when the bot notifies you that a new release is available. The notification message also includes a link to the GitHub release so you can review the changes.
 - Format: `update`
 
+## checkUpdate
+Manually checks if a new version is available and posts the result in the control channel.
+- Format: `checkUpdate`
+
 ## skipUpdate
 Clears the current update notification without installing anything.
 - Format: `skipUpdate`

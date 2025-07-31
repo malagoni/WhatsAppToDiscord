@@ -2,6 +2,7 @@ const { fork } = require('child_process');
 const path = require('path');
 const pino = require('pino');
 const pretty = require('pino-pretty');
+const fs = require('fs');
 
 const logger = pino({}, pino.multistream([
   { stream: pino.destination('logs.txt') },
@@ -22,8 +23,14 @@ function start() {
       process.exit(code ?? 0);
     }
 
-    if (code !== 0) {
-      logger.error(`Bot exited unexpectedly with code ${code ?? signal}. Restarting in ${RESTART_DELAY / 1000}s...`);
+    const restartRequested = fs.existsSync('restart.flag');
+    if (restartRequested) {
+      fs.unlinkSync('restart.flag');
+    }
+
+    if (code !== 0 || restartRequested) {
+      const reason = code !== 0 ? ` unexpectedly with code ${code ?? signal}` : '';
+      logger.error(`Bot exited${reason}. Restarting in ${RESTART_DELAY / 1000}s...`);
       setTimeout(start, RESTART_DELAY);
     } else {
       process.exit(0);
