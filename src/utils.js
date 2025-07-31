@@ -501,13 +501,21 @@ const whatsapp = {
   isQuoted(msg) {
     return msg.contextInfo?.quotedMessage;
   },
-  getQuote(msg) {
-    if (this.isQuoted(msg)) {
-      return {
-        name: this.jidToName(msg.contextInfo.participant || ''),
-        content: msg.contextInfo.quotedMessage.conversation,
-      };
-    }
+  async getQuote(msg) {
+    if (!this.isQuoted(msg)) return null;
+
+    const qMsg = msg.contextInfo.quotedMessage;
+    const qMsgType = this.getMessageType({ message: qMsg });
+
+    const [nMsgType, message] = this.getMessage({ message: qMsg }, qMsgType);
+    const content = this.getContent(message, nMsgType, qMsgType);
+    const file = await this.getFile({ message: qMsg }, qMsgType);
+
+    return {
+      name: this.jidToName(msg.contextInfo.participant || ''),
+      content,
+      file,
+    };
   },
   getMessage(rawMsg, msgType) {
     if (msgType === 'documentWithCaptionMessage') {

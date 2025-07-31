@@ -43,7 +43,17 @@ client.on('whatsappMessage', async (message) => {
     msgContent += `forwarded message:\n${message.content.split('\n').join('\n> ')}`;
   }
   else if (message.quote) {
-    msgContent += `> ${message.quote.name}: ${message.quote.content.split('\n').join('\n> ')}\n${message.content}`;
+    const qContent = (message.quote.content || '').split('\n').join('\n> ');
+    msgContent += `> ${message.quote.name}: ${qContent}\n${message.content}`;
+    if (message.quote.file) {
+      if (message.quote.file.largeFile && state.settings.LocalDownloads) {
+        msgContent += await utils.discord.downloadLargeFile(message.quote.file);
+      } else if (message.quote.file === -1 && !state.settings.LocalDownloads) {
+        msgContent += "WA2DC Attention: Received a file, but it's over 8MB. Check WhatsApp on your phone or enable local downloads.";
+      } else {
+        files.push(message.quote.file);
+      }
+    }
   }
   else if (message.isEdit) {
     msgContent += "Edited message:\n" + message.content;
