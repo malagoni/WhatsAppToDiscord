@@ -15,7 +15,7 @@ let child;
 let shuttingDown = false;
 
 function start() {
-  child = spawn(process.argv0, [INDEX_PATH], { stdio: 'inherit' });
+  child = spawn(process.argv0, ['--no-deprecation', INDEX_PATH], { stdio: 'inherit' });
 
   child.on('exit', (code, signal) => {
     if (shuttingDown) {
