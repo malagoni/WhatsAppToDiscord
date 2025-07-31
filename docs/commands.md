@@ -144,3 +144,11 @@ Allows sending webhook messages to be redirected to WhatsApp.
 ## ping
 Replies back with *"Pong <Now - Time Message Sent>"ms*. It basically shows the bot's ping with the server. An unsynced date and time on your computer may cause big or even negative ping results, however, it doesn't mean you got negative ping or 10mins of lag, rather it is the Discord's time and your computer's time difference plus your ping.
 - Format: `ping`
+
+## update
+Downloads and installs the latest version when the bot notifies you that a new release is available. The notification message also includes a link to the GitHub release so you can review the changes.
+- Format: `update`
+
+## skipUpdate
+Clears the current update notification without installing anything.
+- Format: `skipUpdate`
