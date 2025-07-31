@@ -254,7 +254,7 @@ const commands = {
     await controlChannel.send('Disabled uploading files to WhatsApp!');
   },
   async help() {
-    await controlChannel.send('See all the available commands at https://fklc.github.io/WhatsAppToDiscord/#/commands');
+    await controlChannel.send('See all the available commands at https://arespawn.github.io/WhatsAppToDiscord/#/commands');
   },
   async resync() {
     await state.waClient.authState.keys.set({

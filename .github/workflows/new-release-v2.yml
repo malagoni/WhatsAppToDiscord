@@ -1,4 +1,4 @@
-name: Build Linux & Windows and Release
+name: Build and Release Binaries
 
 on:
   workflow_dispatch:
@@ -9,6 +9,8 @@ on:
   push:
     tags:
       - "v*"
+    branches:
+      - main
 
 jobs:
   build:
@@ -18,43 +20,73 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Auto bump version
+        if: github.ref_type == 'branch' && !contains(github.event.head_commit.message, 'chore: release')
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          NEW_TAG=$(npm version patch -m "chore: release %s")
+          git push origin HEAD --tags
+          echo "::notice ::Created $NEW_TAG"
+          exit 0
+
       - uses: actions/setup-node@v4
+        if: github.ref_type != 'branch'
         with:
           node-version: '22'
           cache: npm
 
       - name: Install dependencies
+        if: github.ref_type != 'branch'
         run: npm ci
 
       - name: Build with esbuild
+        if: github.ref_type != 'branch'
         run: |
           npx esbuild src/index.js \
             --bundle --platform=node --format=cjs \
             --external:sharp --external:qrcode-terminal --external:jimp --external:link-preview-js \
             --target=node22 --outfile=out.js
 
-      - name: Package binaries (Linux & Windows)
+      - name: Package binaries
+        if: github.ref_type != 'branch'
         run: |
           mkdir -p build
           npx -y @yao-pkg/pkg out.js \
             -t node22-linux-x64 --options no-warnings \
             -o build/WA2DC-Linux
           npx -y @yao-pkg/pkg out.js \
+            -t node22-linux-arm64 --options no-warnings \
+            -o build/WA2DC-Linux-arm64
+          npx -y @yao-pkg/pkg out.js \
+            -t node22-macos-x64 --options no-warnings \
+            -o build/WA2DC-macOS
+          npx -y @yao-pkg/pkg out.js \
             -t node22-win-x64 --options no-warnings \
             --no-bytecode --public --public-packages "*" \
             -o build/WA2DC.exe
 
       - name: Checksums
+        if: github.ref_type != 'branch'
         run: |
           sha256sum build/WA2DC-Linux > build/WA2DC-Linux.sha256
+          sha256sum build/WA2DC-Linux-arm64 > build/WA2DC-Linux-arm64.sha256
+          sha256sum build/WA2DC-macOS > build/WA2DC-macOS.sha256
           sha256sum build/WA2DC.exe   > build/WA2DC.exe.sha256
 
-      - name: Create platform ZIPs
+      - name: Sign binaries
+        if: github.ref_type != 'branch'
+        env:
+          SIGN_KEY: ${{ secrets.SIGN_KEY }}
         run: |
-          zip -j build/WA2DC-linux-x64.zip  build/WA2DC-Linux  build/WA2DC-Linux.sha256
-          zip -j build/WA2DC-win-x64.zip    build/WA2DC.exe    build/WA2DC.exe.sha256
+          echo "$SIGN_KEY" > private.pem
+          openssl dgst -sha256 -sign private.pem -out build/WA2DC-Linux.sig build/WA2DC-Linux
+          openssl dgst -sha256 -sign private.pem -out build/WA2DC-Linux-arm64.sig build/WA2DC-Linux-arm64
+          openssl dgst -sha256 -sign private.pem -out build/WA2DC.exe.sig build/WA2DC.exe
+          rm private.pem
 
       - name: Determine tag
+        if: github.ref_type != 'branch'
         id: tag
         run: |
           if [[ "${{ github.ref_type }}" == "tag" ]]; then
@@ -78,26 +110,36 @@ jobs:
           exit 1
 
       - name: Create / update GitHub Release (gh)
+        if: github.ref_type != 'branch'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           TAG="${{ steps.tag.outputs.value }}"
 
-          # If release exists, update assets; else create and auto-generate notes.
+          ASSETS=(
+            build/WA2DC-Linux
+            build/WA2DC-Linux.sha256
+            build/WA2DC-Linux.sig
+            build/WA2DC-Linux-arm64
+            build/WA2DC-Linux-arm64.sha256
+            build/WA2DC-Linux-arm64.sig
+            build/WA2DC-macOS
+            build/WA2DC-macOS.sha256
+            build/WA2DC.exe
+            build/WA2DC.exe.sha256
+            build/WA2DC.exe.sig
+          )
+
           if gh release view "$TAG" >/dev/null 2>&1; then
             echo "Release $TAG exists — uploading assets..."
-            gh release upload "$TAG" \
-              build/WA2DC-linux-x64.zip \
-              build/WA2DC-win-x64.zip \
-              --clobber
+            gh release upload "$TAG" "${ASSETS[@]}" --clobber
           else
             echo "Creating release $TAG..."
             gh release create "$TAG" \
               --target "${{ github.sha }}" \
               --generate-notes \
               --latest \
-              build/WA2DC-linux-x64.zip \
-              build/WA2DC-win-x64.zip
+              "${ASSETS[@]}"
           fi
 
           echo "Release URL:"

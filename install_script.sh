@@ -9,7 +9,7 @@ curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
 # install nodejs
 sudo apt-get install -y nodejs
 # clone the git
-git clone https://github.com/FKLC/WhatsAppToDiscord
+git clone https://github.com/arespawn/WhatsAppToDiscord
 # get into that dir ;-;
 cd WhatsAppToDiscord
 #node version show

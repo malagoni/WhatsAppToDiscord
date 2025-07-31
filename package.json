@@ -7,8 +7,8 @@
     "start": "node src/runner.js",
     "docs": "docsify serve docs"
   },
-  "author": "Fatih Kilic",
-  "repository": "https://github.com/FKLC/WhatsAppToDiscord",
+  "author": "Arespawn (forked from Fatih Kilic)",
+  "repository": "https://github.com/arespawn/WhatsAppToDiscord",
   "license": "MIT",
   "engines": {
     "node": ">=18"
