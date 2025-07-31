@@ -87,7 +87,7 @@ const connectToWhatsApp = async (retry = 1) => {
                     id: utils.whatsapp.getId(rawMessage),
                     name: utils.whatsapp.getSenderName(rawMessage),
                     content: utils.whatsapp.getContent(message, nMsgType, messageType),
-                    quote: await utils.whatsapp.getQuote(message),
+                    quote: await utils.whatsapp.getQuote(rawMessage),
                     file: await utils.whatsapp.getFile(rawMessage, messageType),
                     profilePic: await utils.whatsapp.getProfilePic(rawMessage),
                     channelJid: utils.whatsapp.getChannelJid(rawMessage),

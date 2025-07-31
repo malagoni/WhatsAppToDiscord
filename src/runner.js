@@ -1,4 +1,4 @@
-const { spawn } = require('child_process');
+const { fork } = require('child_process');
 const path = require('path');
 const pino = require('pino');
 const pretty = require('pino-pretty');
@@ -15,7 +15,7 @@ let child;
 let shuttingDown = false;
 
 function start() {
-  child = spawn(process.argv0, ['--no-deprecation', INDEX_PATH], { stdio: 'inherit' });
+  child = fork(INDEX_PATH, [], { stdio: 'inherit', execArgv: ['--no-deprecation'] });
 
   child.on('exit', (code, signal) => {
     if (shuttingDown) {
