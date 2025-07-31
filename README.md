@@ -18,6 +18,13 @@ Originally created by [Fatih Kilic](https://github.com/FKLC), the project is now
 - Self Hosted, so your data never leaves your computer
 - Automatically restarts itself if it crashes
 
+### Running
+
+Run the bot with `npm start` or use the executable downloaded from the releases
+page. Both methods use a small helper script that watches the process and
+restarts it automatically if it exits unexpectedly. Directly running
+`node src/index.js` will skip this helper and the bot won't restart on crashes.
+
 ---
 
 ### For setup and commands, check out the [documentation](https://arespawn.github.io/WhatsAppToDiscord/)!

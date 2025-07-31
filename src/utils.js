@@ -556,11 +556,16 @@ const whatsapp = {
     const [nMsgType, msg] = this.getMessage(rawMsg, msgType);
     if (msg.fileLength == null) return;
     if (msg.fileLength.low > 26214400 && !state.settings.LocalDownloads) return -1;
-    return {
-      name: this.getFilename(msg, nMsgType),
-      attachment: await downloadMediaMessage(rawMsg, 'buffer', {}, { logger: state.logger, reuploadRequest: state.waClient.updateMediaMessage }),
-      largeFile: msg.fileLength.low > 26214400,
-    };
+    try {
+      return {
+        name: this.getFilename(msg, nMsgType),
+        attachment: await downloadMediaMessage(rawMsg, 'buffer', {}, { logger: state.logger, reuploadRequest: state.waClient.updateMediaMessage }),
+        largeFile: msg.fileLength.low > 26214400,
+      };
+    } catch (err) {
+      state.logger?.error(err);
+      return null;
+    }
   },
   inWhitelist(rawMsg) {
     return state.settings.Whitelist.length === 0 || state.settings.Whitelist.includes(rawMsg?.key?.remoteJid || rawMsg.chatId);
