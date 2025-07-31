@@ -33,4 +33,5 @@ module.exports = {
   sentMessages: new Set(),
   goccRuns: {},
   updateInfo: null,
+  version: '',
 };

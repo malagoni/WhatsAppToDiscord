@@ -4,6 +4,7 @@ if (!globalThis.crypto) {
 }
 const pino = require('pino');
 const pretty = require('pino-pretty');
+const fs = require('fs');
 
 const discordHandler =  require('./discordHandler.js');
 const state =  require('./state.js');
@@ -12,7 +13,8 @@ const storage = require('./storage.js');
 const whatsappHandler =  require('./whatsappHandler.js');
 
 (async () => {
-  const version = 'v1.1.10';
+  const version = 'v1.1.11';
+  state.version = version;
   const streams = [
     { stream: pino.destination('logs.txt') },
     { stream: pretty({ colorize: true }) },
@@ -24,6 +26,23 @@ const whatsappHandler =  require('./whatsappHandler.js');
       clearInterval(autoSaver);
       state.logger.error(err);
       state.logger.info('Exiting!');
+      try {
+        const ctrl = await utils.discord.getControlChannel();
+        if (ctrl) {
+          let logs = '';
+          try {
+            logs = await fs.promises.readFile('logs.txt', 'utf8');
+            logs = logs.split('\n').slice(-20).join('\n');
+          } catch {}
+          await ctrl.send(
+            `Bot crashed: \n\n\u0060\u0060\u0060\n${err?.stack || err}\n\u0060\u0060\u0060` +
+            (logs ? `\nRecent logs:\n\u0060\u0060\u0060\n${logs}\n\u0060\u0060\u0060` : '')
+          );
+        }
+      } catch (e) {
+        state.logger.error('Failed to send crash info to Discord');
+        state.logger.error(e);
+      }
       if (['SIGINT', 'SIGTERM'].includes(eventName)) {
         await storage.save();
         process.exit(0);
@@ -81,6 +100,18 @@ const whatsappHandler =  require('./whatsappHandler.js');
       `Changelog: ${state.updateInfo.changes}\nType \`update\` to apply or \`skipUpdate\` to ignore.`
     );
   }
+
+  setInterval(async () => {
+    await utils.updater.run(version, { prompt: false });
+    if (state.updateInfo) {
+      const ch = await utils.discord.getControlChannel();
+      await ch?.send(
+        `A new version is available ${state.updateInfo.currVer} -> ${state.updateInfo.version}.\n` +
+        `See ${state.updateInfo.url}\n` +
+        `Changelog: ${state.updateInfo.changes}\nType \`update\` to apply or \`skipUpdate\` to ignore.`
+      );
+    }
+  }, 2 * 24 * 60 * 60 * 1000);
 
   state.logger.info('Bot is now running. Press CTRL-C to exit.');
 })();
