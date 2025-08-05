@@ -491,6 +491,17 @@ const whatsapp = {
   contacts() {
     return Object.values(state.waClient.contacts);
   },
+  getMentionedJids(text) {
+    const mentions = [];
+    if (!text) return mentions;
+    const lower = text.toLowerCase();
+    for (const [jid, name] of Object.entries(state.contacts)) {
+      if (lower.includes(`@${name.toLowerCase()}`)) {
+        mentions.push(jid);
+      }
+    }
+    return mentions;
+  },
   async sendQR(qrString) {
     await (await discord.getControlChannel())
       .send({ files: [new MessageAttachment(await QRCode.toBuffer(qrString), 'qrcode.png')] });
@@ -629,6 +640,12 @@ const whatsapp = {
       case 'stickerMessage':
         content += msg.caption || '';
         break;
+    }
+    const mentions = msg.contextInfo?.mentionedJid || [];
+    for (const jid of mentions) {
+      const name = this.jidToName(jid);
+      const regex = new RegExp(`@${this.jidToPhone(jid)}\\b`, 'g');
+      content = content.replace(regex, `@${name}`);
     }
     return content;
   },

@@ -202,6 +202,11 @@ const connectToWhatsApp = async (retry = 1) => {
             }
         }
 
+        const mentionJids = utils.whatsapp.getMentionedJids(content.text);
+        if (mentionJids.length) {
+            content.mentions = mentionJids;
+        }
+
         if (message.content === "") return;
 
         const sent = await client.sendMessage(jid, content, options);
@@ -229,12 +234,13 @@ const connectToWhatsApp = async (retry = 1) => {
             const prefix = state.settings.DiscordPrefixText || message.member?.nickname || message.author.username;
             text = `*${prefix}*\n${text}`;
         }
-
+        const editMentions = utils.whatsapp.getMentionedJids(text);
         const editMsg = await client.sendMessage(
             jid,
             {
                 text,
                 edit: key,
+                ...(editMentions.length ? { mentions: editMentions } : {}),
             }
         );
         state.sentMessages.add(editMsg.key.id);

@@ -13,6 +13,7 @@ Originally created by [Fatih Kilic](https://github.com/FKLC), the project is now
 - Supports media (Image, Video, Audio, Document, Stickers) and reactions!
 - Allows whitelisting, so you can choose what to see on Discord
 - Allows usage of WhatsApp through the Discord overlay
+- Translates mentions between WhatsApp and Discord
 - It uses less memory as it doesn't simulate a browser
 - Open Source, you can see, modify and run your own version of the bot!
 - Self Hosted, so your data never leaves your computer
