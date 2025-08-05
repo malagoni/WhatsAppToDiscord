@@ -4,6 +4,8 @@ const state = require('./state.js');
 const utils = require('./utils.js');
 const fs = require('fs');
 
+const DEFAULT_AVATAR_URL = 'https://cdn.discordapp.com/embed/avatars/0.png';
+
 const client = new Client({
   intents: [
     Intents.FLAGS.GUILDS,
@@ -41,6 +43,7 @@ client.on('whatsappMessage', async (message) => {
   let msgContent = '';
   const files = [];
   const webhook = await utils.discord.getOrCreateChannel(message.channelJid);
+  const avatarURL = message.profilePic || DEFAULT_AVATAR_URL;
 
   if (message.isGroup && state.settings.WAGroupPrefix) { msgContent += `[${message.name}] `; }
 
@@ -85,14 +88,14 @@ client.on('whatsappMessage', async (message) => {
       await utils.discord.safeWebhookSend(webhook, {
         content: msgContent.shift(),
         username: message.name,
-        avatarURL: message.profilePic,
+        avatarURL,
       }, message.channelJid);
     }
     const dcMessage = await utils.discord.safeWebhookSend(webhook, {
       content: msgContent.shift() || null,
       username: message.name,
       files,
-      avatarURL: message.profilePic,
+      avatarURL,
     }, message.channelJid);
     if (dcMessage.channel.type === 'GUILD_NEWS' && state.settings.Publish) {
       await dcMessage.crosspost();
@@ -142,10 +145,11 @@ client.on('whatsappCall', async ({ call, jid }) => {
   }
 
   if (content !== '') {
+    const avatarURL = (await utils.whatsapp.getProfilePic(call)) || DEFAULT_AVATAR_URL;
     await webhook.send({
       content,
       username: name,
-      avatarURL: await utils.whatsapp.getProfilePic(call),
+      avatarURL,
     });
   }
 });
