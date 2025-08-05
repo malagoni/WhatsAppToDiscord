@@ -13,7 +13,7 @@ const storage = require('./storage.js');
 const whatsappHandler =  require('./whatsappHandler.js');
 
 (async () => {
-  const version = 'v1.1.12';
+  const version = 'v1.1.13';
   state.version = version;
   const streams = [
     { stream: pino.destination('logs.txt') },
@@ -33,7 +33,9 @@ const whatsappHandler =  require('./whatsappHandler.js');
           try {
             logs = await fs.promises.readFile('logs.txt', 'utf8');
             logs = logs.split('\n').slice(-20).join('\n');
-          } catch {}
+          } catch (err) {
+            // ignore read errors
+          }
           await ctrl.send(
             `Bot crashed: \n\n\u0060\u0060\u0060\n${err?.stack || err}\n\u0060\u0060\u0060` +
             (logs ? `\nRecent logs:\n\u0060\u0060\u0060\n${logs}\n\u0060\u0060\u0060` : '')
