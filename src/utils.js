@@ -494,8 +494,11 @@ const whatsapp = {
   getMentionedJids(text) {
     const mentions = [];
     if (!text) return mentions;
-    const lower = text.toLowerCase();
+    
+    const lower = text.replace(/<@!?\d+>/g, '').toLowerCase();
+
     for (const [jid, name] of Object.entries(state.contacts)) {
+      if (!name) continue;
       if (lower.includes(`@${name.toLowerCase()}`)) {
         mentions.push(jid);
       }
