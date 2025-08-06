@@ -494,8 +494,15 @@ const whatsapp = {
   getMentionedJids(text) {
     const mentions = [];
     if (!text) return mentions;
-    const lower = text.toLowerCase();
+
+    // Discord replies include mentions in the form <@123> or <@!123>.
+    // These numeric identifiers can partially match many WhatsApp contact
+    // numbers which results in everyone in the group being mentioned.
+    // Strip such Discord-specific mentions before scanning for @names.
+    const lower = text.replace(/<@!?\d+>/g, '').toLowerCase();
+
     for (const [jid, name] of Object.entries(state.contacts)) {
+      if (!name) continue;
       if (lower.includes(`@${name.toLowerCase()}`)) {
         mentions.push(jid);
       }
