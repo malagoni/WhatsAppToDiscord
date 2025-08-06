@@ -178,13 +178,15 @@ const connectToWhatsApp = async (retry = 1) => {
         const options = {};
 
         if (state.settings.UploadAttachments) {
-            await Promise.all(message.attachments.map((file) =>
-                client.sendMessage(jid, utils.whatsapp.createDocumentContent(file))
-                    .then(m => {
-                        state.lastMessages[message.id] = m.key.id;
-                        state.sentMessages.add(m.key.id);
-                    })
-            ));
+            await Promise.all(message.attachments.map(async (file) => {
+                try {
+                    const m = await client.sendMessage(jid, utils.whatsapp.createDocumentContent(file));
+                    state.lastMessages[message.id] = m.key.id;
+                    state.sentMessages.add(m.key.id);
+                } catch (err) {
+                    state.logger?.error(err);
+                }
+            }));
             content.text = message.content || "";
         } else {
             content.text = [message.content, ...Object.values(message.attachments).map((file) => file.url)].join(' ');
@@ -209,9 +211,13 @@ const connectToWhatsApp = async (retry = 1) => {
 
         if (message.content === "") return;
 
-        const sent = await client.sendMessage(jid, content, options);
-        state.lastMessages[message.id] = sent.key.id;
-        state.sentMessages.add(sent.key.id);
+        try {
+            const sent = await client.sendMessage(jid, content, options);
+            state.lastMessages[message.id] = sent.key.id;
+            state.sentMessages.add(sent.key.id);
+        } catch (err) {
+            state.logger?.error(err);
+        }
     });
 
     client.ev.on('discordEdit', async ({ jid, message }) => {
@@ -235,15 +241,19 @@ const connectToWhatsApp = async (retry = 1) => {
             text = `*${prefix}*\n${text}`;
         }
         const editMentions = utils.whatsapp.getMentionedJids(text);
-        const editMsg = await client.sendMessage(
-            jid,
-            {
-                text,
-                edit: key,
-                ...(editMentions.length ? { mentions: editMentions } : {}),
-            }
-        );
-        state.sentMessages.add(editMsg.key.id);
+        try {
+            const editMsg = await client.sendMessage(
+                jid,
+                {
+                    text,
+                    edit: key,
+                    ...(editMentions.length ? { mentions: editMentions } : {}),
+                }
+            );
+            state.sentMessages.add(editMsg.key.id);
+        } catch (err) {
+            state.logger?.error(err);
+        }
     });
 
     client.ev.on('discordReaction', async ({ jid, reaction, removed }) => {
@@ -261,15 +271,19 @@ const connectToWhatsApp = async (retry = 1) => {
             key.participant = utils.whatsapp.toJid(reaction.message.author.username);
         }
 
-        const reactionMsg = await client.sendMessage(jid, {
-            react: {
-                text: removed ? '' : reaction.emoji.name,
-                key,
-            },
-        });
-        const messageId = reactionMsg.key.id;
-        state.lastMessages[messageId] = true;
-        state.sentMessages.add(messageId);
+        try {
+            const reactionMsg = await client.sendMessage(jid, {
+                react: {
+                    text: removed ? '' : reaction.emoji.name,
+                    key,
+                },
+            });
+            const messageId = reactionMsg.key.id;
+            state.lastMessages[messageId] = true;
+            state.sentMessages.add(messageId);
+        } catch (err) {
+            state.logger?.error(err);
+        }
     });
 
     return client;
