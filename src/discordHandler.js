@@ -282,7 +282,11 @@ const commands = {
     await state.waClient.resyncAppState(['critical_unblock_low']);
     for (const [jid, attributes] of Object.entries(await state.waClient.groupFetchAllParticipating())) { state.waClient.contacts[jid] = attributes.subject; }
     if (params.includes('rename')) {
-      await utils.discord.renameChannels();
+      try {
+        await utils.discord.renameChannels();
+      } catch (err) {
+        state.logger?.error(err);
+      }
     }
     await controlChannel.send('Re-synced!');
   },
