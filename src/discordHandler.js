@@ -101,8 +101,10 @@ client.on('whatsappMessage', async (message) => {
       await dcMessage.crosspost();
     }
 
-    if (message.id != null)
+    if (message.id != null) {
       state.lastMessages[dcMessage.id] = message.id;
+      state.lastMessages[message.id] = dcMessage.id;
+    }
   }
 });
 
@@ -122,6 +124,26 @@ client.on('whatsappReaction', async (reaction) => {
       await channel.send(`Unknown emoji reaction (${reaction.text}) received. Check WhatsApp app to see it.`);
     }
   });
+});
+
+client.on('whatsappDelete', async ({ id, jid }) => {
+  if ((state.settings.oneWay >> 0 & 1) === 0) {
+    return;
+  }
+
+  const channelId = state.chats[jid]?.channelId;
+  const messageId = state.lastMessages[id];
+  if (channelId == null || messageId == null) {
+    return;
+  }
+
+  try {
+    const channel = await utils.discord.getChannel(channelId);
+    const message = await channel.messages.fetch(messageId);
+    await message.edit({ content: '🗑️ WhatsApp message deleted', attachments: [] });
+  } catch (err) {
+    state.logger?.error(err);
+  }
 });
 
 client.on('whatsappCall', async ({ call, jid }) => {
@@ -438,12 +460,31 @@ client.on('messageUpdate', async (_, message) => {
 
   const messageId = state.lastMessages[message.id];
   if (messageId == null) {
-    await message.channel.send("Couldn't edit the message. You can only edit the last 500 messages.");
+    await message.channel.send(`Couldn't edit the message. You can only edit the last ${state.settings.lastMessageStorage} messages.`);
     return;
   }
 
   state.waClient.ev.emit('discordEdit', { jid, message });
 })
+
+client.on('messageDelete', async (message) => {
+  if (message.webhookId != null) {
+    return;
+  }
+
+  const jid = utils.discord.channelIdToJid(message.channelId);
+  if (jid == null) {
+    return;
+  }
+
+  const waId = state.lastMessages[message.id];
+  if (waId == null) {
+    await message.channel.send(`Couldn't delete the message. You can only delete the last ${state.settings.lastMessageStorage} messages.`);
+    return;
+  }
+
+  state.waClient.ev.emit('discordDelete', { jid, id: waId });
+});
 
 client.on('messageReactionAdd', async (reaction, user) => {
   const jid = utils.discord.channelIdToJid(reaction.message.channel.id);
@@ -452,7 +493,7 @@ client.on('messageReactionAdd', async (reaction, user) => {
   }
   const messageId = state.lastMessages[reaction.message.id];
   if (messageId == null) {
-    await reaction.message.channel.send("Couldn't send the reaction. You can only react to last 500 messages.");
+    await reaction.message.channel.send(`Couldn't send the reaction. You can only react to last ${state.settings.lastMessageStorage} messages.`);
     return;
   }
   if (user.id === state.dcClient.user.id) {
@@ -469,7 +510,7 @@ client.on('messageReactionRemove', async (reaction, user) => {
   }
   const messageId = state.lastMessages[reaction.message.id];
   if (messageId == null) {
-    await reaction.message.channel.send("Couldn't remove the reaction. You can only react to last 500 messages.");
+    await reaction.message.channel.send(`Couldn't remove the reaction. You can only react to last ${state.settings.lastMessageStorage} messages.`);
     return;
   }
   if (user.id === state.dcClient.user.id) {

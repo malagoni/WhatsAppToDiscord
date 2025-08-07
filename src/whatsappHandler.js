@@ -116,6 +116,18 @@ const connectToWhatsApp = async (retry = 1) => {
         }
     });
 
+    client.ev.on('messages.delete', async (updates) => {
+        if ('keys' in updates) {
+            for (const key of updates.keys) {
+                if (!utils.whatsapp.inWhitelist({ chatId: key.remoteJid })) continue;
+                state.dcClient.emit('whatsappDelete', {
+                    id: key.id,
+                    jid: key.remoteJid,
+                });
+            }
+        }
+    });
+
     client.ev.on('call', async (calls) => {
         for await (const call of calls) {
             if (!utils.whatsapp.inWhitelist(call) || !utils.whatsapp.sentAfterStart(call))
@@ -281,6 +293,24 @@ const connectToWhatsApp = async (retry = 1) => {
             const messageId = reactionMsg.key.id;
             state.lastMessages[messageId] = true;
             state.sentMessages.add(messageId);
+        } catch (err) {
+            state.logger?.error(err);
+        }
+    });
+
+    client.ev.on('discordDelete', async ({ jid, id }) => {
+        if ((state.settings.oneWay >> 1 & 1) === 0) {
+            return;
+        }
+
+        try {
+            await client.sendMessage(jid, {
+                delete: {
+                    remoteJid: jid,
+                    id,
+                    fromMe: true,
+                },
+            });
         } catch (err) {
             state.logger?.error(err);
         }
