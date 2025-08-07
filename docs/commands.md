@@ -130,7 +130,7 @@ Changes the auto save interval to the number of seconds you provide.
 - Example: `autoSaveInterval 60`
 
 ## lastMessageStorage
-Changes the last message storage size to the number provide. Last message storage size determines the number of last messages you can reply to. A value of 1000 would mean, you can react or reply to last 1000 messages received or sent. 
+Changes the last message storage size to the number provided. This determines how many recent messages you can edit, delete, react to, or reply to. A value of 1000 would mean you can interact with the last 1000 messages received or sent.
 - Format: `lastMessageStorage <size>`
 - Example: `lastMessageStorage 1000`
 
