@@ -51,11 +51,13 @@ const whatsappHandler =  require('./whatsappHandler.js');
         state.logger.error('Failed to send crash info to Discord');
         state.logger.error(e);
       }
-      if (['SIGINT', 'SIGTERM'].includes(eventName)) {
+      try {
         await storage.save();
-        process.exit(0);
+      } catch (e) {
+        state.logger.error('Failed to save storage');
+        state.logger.error(e);
       }
-      process.exit(1);
+      process.exit(['SIGINT', 'SIGTERM'].includes(eventName) ? 0 : 1);
     });
   });
 
