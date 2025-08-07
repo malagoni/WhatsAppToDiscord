@@ -26,18 +26,19 @@ const whatsappHandler =  require('./whatsappHandler.js');
       clearInterval(autoSaver);
       state.logger.error(err);
       state.logger.info('Exiting!');
+      let logs = '';
+      try {
+        logs = await fs.promises.readFile('logs.txt', 'utf8');
+        logs = logs.split('\n').slice(-20).join('\n');
+      } catch (readErr) {
+        // ignore read errors
+      }
+      const content = `Bot crashed: \n\n\u0060\u0060\u0060\n${err?.stack || err}\n\u0060\u0060\u0060` +
+        (logs ? `\nRecent logs:\n\u0060\u0060\u0060\n${logs}\n\u0060\u0060\u0060` : '');
+      let sent = false;
       try {
         const ctrl = await utils.discord.getControlChannel();
         if (ctrl) {
-          let logs = '';
-          try {
-            logs = await fs.promises.readFile('logs.txt', 'utf8');
-            logs = logs.split('\n').slice(-20).join('\n');
-          } catch (err) {
-            // ignore read errors
-          }
-          let content = `Bot crashed: \n\n\u0060\u0060\u0060\n${err?.stack || err}\n\u0060\u0060\u0060` +
-            (logs ? `\nRecent logs:\n\u0060\u0060\u0060\n${logs}\n\u0060\u0060\u0060` : '');
           if (content.length > 2000) {
             await ctrl.send({
               content: `${content.slice(0, 1997)}...`,
@@ -46,10 +47,19 @@ const whatsappHandler =  require('./whatsappHandler.js');
           } else {
             await ctrl.send(content);
           }
+          sent = true;
         }
       } catch (e) {
         state.logger.error('Failed to send crash info to Discord');
         state.logger.error(e);
+      }
+      if (!sent) {
+        try {
+          await fs.promises.writeFile('crash-report.txt', content, 'utf8');
+        } catch (e) {
+          state.logger.error('Failed to write crash report to disk');
+          state.logger.error(e);
+        }
       }
       try {
         await storage.save();
@@ -95,6 +105,30 @@ const whatsappHandler =  require('./whatsappHandler.js');
   await utils.discord.repairChannels();
   await discordHandler.setControlChannel();
   state.logger.info('Repaired channels.');
+
+  // Send any queued crash report
+  try {
+    const crashFile = 'crash-report.txt';
+    const queued = await fs.promises.readFile(crashFile, 'utf8');
+    const ctrl = await utils.discord.getControlChannel();
+    if (ctrl) {
+      if (queued.length > 2000) {
+        await ctrl.send({
+          content: `${queued.slice(0, 1997)}...`,
+          files: [{ attachment: Buffer.from(queued, 'utf8'), name: 'crash.txt' }],
+        });
+      } else {
+        await ctrl.send(queued);
+      }
+      await fs.promises.unlink(crashFile);
+      state.logger.info('Queued crash report sent.');
+    }
+  } catch (e) {
+    if (e.code !== 'ENOENT') {
+      state.logger.error('Failed to send queued crash report');
+      state.logger.error(e);
+    }
+  }
 
   await whatsappHandler.start();
   state.logger.info('WhatsApp client started.');
