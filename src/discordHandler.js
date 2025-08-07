@@ -63,11 +63,31 @@ client.on('whatsappMessage', async (message) => {
       }
     }
   }
-  else if (message.isEdit) {
-    msgContent += "Edited message:\n" + message.content;
-  }
   else {
     msgContent += message.content;
+  }
+
+  if (message.isEdit) {
+    const dcMessageId = state.lastMessages[message.id];
+    if (dcMessageId) {
+      try {
+        await utils.discord.safeWebhookEdit(webhook, dcMessageId, { content: msgContent || null }, message.channelJid);
+        return;
+      } catch (err) {
+        state.logger?.error(err);
+      }
+    }
+    msgContent = `Edited message:\n${msgContent}`;
+    const dcMessage = await utils.discord.safeWebhookSend(webhook, {
+      content: msgContent,
+      username: message.name,
+      avatarURL,
+    }, message.channelJid);
+    if (message.id != null) {
+      state.lastMessages[dcMessage.id] = message.id;
+      state.lastMessages[message.id] = dcMessage.id;
+    }
+    return;
   }
 
   if (message.file) {
