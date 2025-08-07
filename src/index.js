@@ -38,10 +38,14 @@ const whatsappHandler =  require('./whatsappHandler.js');
           }
           let content = `Bot crashed: \n\n\u0060\u0060\u0060\n${err?.stack || err}\n\u0060\u0060\u0060` +
             (logs ? `\nRecent logs:\n\u0060\u0060\u0060\n${logs}\n\u0060\u0060\u0060` : '');
-          if (content.length > 4000) {
-            content = `${content.slice(0, 3997)}...`;
+          if (content.length > 2000) {
+            await ctrl.send({
+              content: `${content.slice(0, 1997)}...`,
+              files: [{ attachment: Buffer.from(content, 'utf8'), name: 'crash.txt' }],
+            });
+          } else {
+            await ctrl.send(content);
           }
-          await ctrl.send(content);
         }
       } catch (e) {
         state.logger.error('Failed to send crash info to Discord');
