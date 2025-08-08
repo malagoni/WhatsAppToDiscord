@@ -128,6 +128,19 @@ const connectToWhatsApp = async (retry = 1) => {
         }
     });
 
+    client.ev.on('messages.update', async (updates) => {
+        for (const { update, key } of updates) {
+            const protocol = update.message?.protocolMessage;
+            if (protocol?.type !== baileys.proto.Message.ProtocolMessage.Type.REVOKE) continue;
+            const msgKey = protocol.key || key;
+            if (!utils.whatsapp.inWhitelist({ chatId: msgKey.remoteJid })) continue;
+            state.dcClient.emit('whatsappDelete', {
+                id: msgKey.id,
+                jid: msgKey.remoteJid,
+            });
+        }
+    });
+
     client.ev.on('call', async (calls) => {
         for await (const call of calls) {
             if (!utils.whatsapp.inWhitelist(call) || !utils.whatsapp.sentAfterStart(call))
