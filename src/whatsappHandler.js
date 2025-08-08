@@ -265,6 +265,7 @@ const connectToWhatsApp = async (retry = 1) => {
             state.sentMessages.add(editMsg.key.id);
         } catch (err) {
             state.logger?.error(err);
+            await message.channel.send("Couldn't edit the message on WhatsApp.");
         }
     });
 

@@ -484,6 +484,11 @@ client.on('messageUpdate', async (_, message) => {
     return;
   }
 
+  if (message.content.trim() === '') {
+    await message.channel.send('Edited message has no text to send to WhatsApp.');
+    return;
+  }
+
   state.waClient.ev.emit('discordEdit', { jid, message });
 })
 
