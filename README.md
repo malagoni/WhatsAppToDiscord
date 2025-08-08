@@ -29,6 +29,10 @@ page. Both methods use a small helper script that watches the process and
 restarts it automatically if it exits unexpectedly. Directly running
 `node src/index.js` will skip this helper and the bot won't restart on crashes.
 
+Runtime logs are written to `logs.txt`. Everything printed to the terminal is
+also saved to `terminal.log`, which can help diagnose issues when running on a
+headless server.
+
 Alternatively, you can run the bot using `docker-compose`. Copy `.env.example`
 to `.env`, put your Discord bot token in it and execute `docker compose up -d`.
 The compose file mounts the `storage` directory so data is kept between
