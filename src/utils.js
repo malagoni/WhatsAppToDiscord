@@ -644,7 +644,7 @@ const whatsapp = {
   },
   sentAfterStart(rawMsg) {
     const ts = this.getTimestamp(rawMsg);
-    const id = rawMsg?.key?.id;
+    const id = this.getId(rawMsg);
     return ts > state.startTime || !Object.prototype.hasOwnProperty.call(state.lastMessages, id);
   },
   getMessageType(rawMsg) {
@@ -659,7 +659,7 @@ const whatsapp = {
     return this._profilePicsCache[jid];
   },
   getId(rawMsg) {
-    return rawMsg.key.id;
+    return rawMsg.message?.editedMessage?.message?.protocolMessage?.key?.id || rawMsg.key.id;
   },
   getContent(msg, nMsgType, msgType) {
     let content = '';
