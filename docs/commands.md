@@ -69,6 +69,14 @@ When enabled (disabled by default), WhatsApp names will be added to messages sen
 When disabled (disabled by default), WhatsApp names won't be added to messages sent to Discord from WhatsApp. (Note that the bot already sets the username to the message sender's name)
 - Format: `disableWAPrefix`
 
+## enableDeletes
+When enabled (enabled by default), deleting a message on one platform removes it from the other.
+- Format: `enableDeletes`
+
+## disableDeletes
+When disabled, deleting a message on one platform will not affect the other, keeping the history.
+- Format: `disableDeletes`
+
 ## enableLocalDownloads
 When enabled, the bot downloads files larger than 8MB to your download location. See `getDownloadDir` for your download location.
 - Format: `enableLocalDownloads`
