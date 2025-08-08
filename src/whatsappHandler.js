@@ -122,7 +122,7 @@ const connectToWhatsApp = async (retry = 1) => {
                 if (!utils.whatsapp.inWhitelist({ chatId: key.remoteJid })) continue;
                 state.dcClient.emit('whatsappDelete', {
                     id: key.id,
-                    jid: key.remoteJid,
+                    jid: utils.whatsapp.formatJid(key.remoteJid),
                 });
             }
         }
@@ -136,7 +136,7 @@ const connectToWhatsApp = async (retry = 1) => {
             if (!utils.whatsapp.inWhitelist({ chatId: msgKey.remoteJid })) continue;
             state.dcClient.emit('whatsappDelete', {
                 id: msgKey.id,
-                jid: msgKey.remoteJid,
+                jid: utils.whatsapp.formatJid(msgKey.remoteJid),
             });
         }
     });
