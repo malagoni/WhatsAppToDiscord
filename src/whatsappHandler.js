@@ -130,8 +130,11 @@ const connectToWhatsApp = async (retry = 1) => {
     client.ev.on('messages.update', async (updates) => {
         for (const { update, key } of updates) {
             const protocol = update.message?.protocolMessage;
-            if (protocol?.type !== baileys.proto.Message.ProtocolMessage.Type.REVOKE) continue;
-            const msgKey = protocol.key || key;
+            const isDelete =
+                protocol?.type === baileys.proto.Message.ProtocolMessage.Type.REVOKE ||
+                update.messageStubType === baileys.WAMessageStubType.REVOKE;
+            if (!isDelete) continue;
+            const msgKey = protocol?.key || key;
             if (!utils.whatsapp.inWhitelist({ chatId: msgKey.remoteJid })) continue;
             state.dcClient.emit('whatsappDelete', {
                 id: msgKey.id,
