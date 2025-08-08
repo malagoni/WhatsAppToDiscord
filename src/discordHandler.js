@@ -84,8 +84,8 @@ client.on('whatsappMessage', async (message) => {
       avatarURL,
     }, message.channelJid);
     if (message.id != null) {
+      // bidirectional map automatically stores both directions
       state.lastMessages[dcMessage.id] = message.id;
-      state.lastMessages[message.id] = dcMessage.id;
     }
     return;
   }
@@ -122,8 +122,8 @@ client.on('whatsappMessage', async (message) => {
     }
 
     if (message.id != null) {
+      // bidirectional map automatically stores both directions
       state.lastMessages[dcMessage.id] = message.id;
-      state.lastMessages[message.id] = dcMessage.id;
     }
   }
 });
