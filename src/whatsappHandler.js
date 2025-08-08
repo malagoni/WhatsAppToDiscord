@@ -199,28 +199,7 @@ const connectToWhatsApp = async (retry = 1) => {
             return;
         }
         
-        const content = {};
         const options = {};
-
-        if (state.settings.UploadAttachments) {
-            await Promise.all(message.attachments.map(async (file) => {
-                try {
-                    const m = await client.sendMessage(jid, utils.whatsapp.createDocumentContent(file));
-                    state.lastMessages[message.id] = m.key.id;
-                    state.sentMessages.add(m.key.id);
-                } catch (err) {
-                    state.logger?.error(err);
-                }
-            }));
-            content.text = message.content || "";
-        } else {
-            content.text = [message.content, ...Object.values(message.attachments).map((file) => file.url)].join(' ');
-        }
-
-        if (state.settings.DiscordPrefix) {
-            const prefix = state.settings.DiscordPrefixText || message.member?.nickname || message.author.username;
-            content.text = `*${prefix}*\n${content.text}`;
-        }
 
         if (message.reference) {
             options.quoted = await utils.whatsapp.createQuoteMessage(message);
@@ -229,12 +208,53 @@ const connectToWhatsApp = async (retry = 1) => {
             }
         }
 
-        const mentionJids = utils.whatsapp.getMentionedJids(content.text);
+        let text = message.content;
+
+        if (state.settings.DiscordPrefix) {
+            const prefix = state.settings.DiscordPrefixText || message.member?.nickname || message.author.username;
+            text = `*${prefix}*\n${text}`;
+        }
+
+        const mentionJids = utils.whatsapp.getMentionedJids(text);
+
+        if (state.settings.UploadAttachments && message.attachments.size) {
+            let first = true;
+            for (const file of message.attachments.values()) {
+                const doc = utils.whatsapp.createDocumentContent(file);
+                if (first) {
+                    if (text || mentionJids.length) doc.caption = text;
+                    if (mentionJids.length) doc.mentions = mentionJids;
+                    try {
+                        const m = await client.sendMessage(jid, doc, options);
+                        state.lastMessages[message.id] = m.key.id;
+                        state.sentMessages.add(m.key.id);
+                    } catch (err) {
+                        state.logger?.error(err);
+                    }
+                    first = false;
+                } else {
+                    try {
+                        const m = await client.sendMessage(jid, doc);
+                        state.lastMessages[message.id] = m.key.id;
+                        state.sentMessages.add(m.key.id);
+                    } catch (err) {
+                        state.logger?.error(err);
+                    }
+                }
+            }
+            return;
+        }
+
+        const content = {};
+        content.text = state.settings.UploadAttachments
+            ? text || ""
+            : [text, ...Array.from(message.attachments.values()).map((file) => file.url)].join(' ');
+
         if (mentionJids.length) {
             content.mentions = mentionJids;
         }
 
-        if (message.content === "") return;
+        if (content.text === "") return;
 
         try {
             const sent = await client.sendMessage(jid, content, options);

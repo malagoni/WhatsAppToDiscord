@@ -15,31 +15,9 @@ const client = new Client({
   ],
 });
 let controlChannel;
+const pendingAlbums = {};
 
-const setControlChannel = async () => {
-  controlChannel = await utils.discord.getControlChannel();
-};
-
-client.on('ready', async () => {
-  await setControlChannel();
-});
-
-client.on('channelDelete', async (channel) => {
-  if (channel.id === state.settings.ControlChannelID) {
-    controlChannel = await utils.discord.getControlChannel();
-  } else {
-    const jid = utils.discord.channelIdToJid(channel.id);
-    delete state.chats[jid];
-    delete state.goccRuns[jid];
-    state.settings.Categories = state.settings.Categories.filter((id) => channel.id !== id);
-  }
-});
-
-client.on('whatsappMessage', async (message) => {
-  if ((state.settings.oneWay >> 0 & 1) === 0) {
-    return;
-  }
-  
+const sendWhatsappMessage = async (message, mediaFiles = []) => {
   let msgContent = '';
   const files = [];
   const webhook = await utils.discord.getOrCreateChannel(message.channelJid);
@@ -67,6 +45,18 @@ client.on('whatsappMessage', async (message) => {
     msgContent += message.content;
   }
 
+  for (const file of mediaFiles) {
+    if (file.largeFile && state.settings.LocalDownloads) {
+      // eslint-disable-next-line no-await-in-loop
+      msgContent += await utils.discord.downloadLargeFile(file);
+    }
+    else if (file === -1 && !state.settings.LocalDownloads) {
+      msgContent += "WA2DC Attention: Received a file, but it's over 8MB. Check WhatsApp on your phone or enable local downloads.";
+    } else if (file !== -1) {
+      files.push(file);
+    }
+  }
+
   if (message.isEdit) {
     const dcMessageId = state.lastMessages[message.id];
     if (dcMessageId) {
@@ -88,17 +78,6 @@ client.on('whatsappMessage', async (message) => {
       state.lastMessages[dcMessage.id] = message.id;
     }
     return;
-  }
-
-  if (message.file) {
-    if (message.file.largeFile && state.settings.LocalDownloads) {
-      msgContent += await utils.discord.downloadLargeFile(message.file);
-    }
-    else if (message.file === -1 && !state.settings.LocalDownloads) {
-      msgContent += "WA2DC Attention: Received a file, but it's over 8MB. Check WhatsApp on your phone or enable local downloads.";
-    } else {
-      files.push(message.file);
-    }
   }
 
   if (msgContent || files.length) {
@@ -126,6 +105,62 @@ client.on('whatsappMessage', async (message) => {
       state.lastMessages[dcMessage.id] = message.id;
     }
   }
+};
+
+const flushAlbum = async (key) => {
+  const album = pendingAlbums[key];
+  if (!album) return;
+  clearTimeout(album.timer);
+  delete pendingAlbums[key];
+  await sendWhatsappMessage(album.message, album.files);
+};
+
+const setControlChannel = async () => {
+  controlChannel = await utils.discord.getControlChannel();
+};
+
+client.on('ready', async () => {
+  await setControlChannel();
+});
+
+client.on('channelDelete', async (channel) => {
+  if (channel.id === state.settings.ControlChannelID) {
+    controlChannel = await utils.discord.getControlChannel();
+  } else {
+    const jid = utils.discord.channelIdToJid(channel.id);
+    delete state.chats[jid];
+    delete state.goccRuns[jid];
+    state.settings.Categories = state.settings.Categories.filter((id) => channel.id !== id);
+  }
+});
+
+client.on('whatsappMessage', async (message) => {
+  if ((state.settings.oneWay >> 0 & 1) === 0) {
+    return;
+  }
+
+  const key = `${message.channelJid}:${message.name}`;
+
+  if (message.file && !message.isEdit) {
+    if (pendingAlbums[key]) {
+      pendingAlbums[key].files.push(message.file);
+      clearTimeout(pendingAlbums[key].timer);
+      pendingAlbums[key].timer = setTimeout(() => flushAlbum(key), 500);
+      return;
+    }
+    pendingAlbums[key] = {
+      message,
+      files: [message.file],
+      timer: setTimeout(() => flushAlbum(key), 500),
+    };
+    return;
+  }
+
+  if (pendingAlbums[key]) {
+    await flushAlbum(key);
+  }
+
+  await sendWhatsappMessage(message, message.file ? [message.file] : []);
 });
 
 client.on('whatsappReaction', async (reaction) => {
