@@ -394,6 +394,25 @@ const discord = {
       throw err;
     }
   },
+  async safeWebhookDelete(webhook, messageId, jid) {
+    try {
+      return await webhook.deleteMessage(messageId);
+    } catch (err) {
+      if (err.code === 10015 && err.message.includes('Unknown Webhook')) {
+        delete state.goccRuns[jid];
+        const channel = await this.getChannel(state.chats[jid].channelId);
+        webhook = await channel.createWebhook('WA2DC');
+        state.chats[jid] = {
+          id: webhook.id,
+          type: webhook.type,
+          token: webhook.token,
+          channelId: webhook.channelId,
+        };
+        return await webhook.deleteMessage(messageId);
+      }
+      throw err;
+    }
+  },
   async repairChannels() {
     const guild = await this.getGuild();
     await guild.channels.fetch();

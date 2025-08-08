@@ -147,20 +147,18 @@ client.on('whatsappReaction', async (reaction) => {
 });
 
 client.on('whatsappDelete', async ({ id, jid }) => {
-  if ((state.settings.oneWay >> 0 & 1) === 0) {
+  if (!state.settings.DeleteMessages || (state.settings.oneWay >> 0 & 1) === 0) {
     return;
   }
 
-  const channelId = state.chats[jid]?.channelId;
   const messageId = state.lastMessages[id];
-  if (channelId == null || messageId == null) {
+  if (state.chats[jid] == null || messageId == null) {
     return;
   }
 
   try {
-    const channel = await utils.discord.getChannel(channelId);
-    const message = await channel.messages.fetch(messageId);
-    await message.edit({ content: '🗑️ WhatsApp message deleted', attachments: [] });
+    const webhook = await utils.discord.getOrCreateChannel(jid);
+    await utils.discord.safeWebhookDelete(webhook, messageId, jid);
   } catch (err) {
     state.logger?.error(err);
   }
@@ -313,6 +311,14 @@ const commands = {
   async disablewaupload() {
     state.settings.UploadAttachments = false;
     await controlChannel.send('Disabled uploading files to WhatsApp!');
+  },
+  async enabledeletes() {
+    state.settings.DeleteMessages = true;
+    await controlChannel.send('Enabled message delete syncing!');
+  },
+  async disabledeletes() {
+    state.settings.DeleteMessages = false;
+    await controlChannel.send('Disabled message delete syncing!');
   },
   async help() {
     await controlChannel.send('See all the available commands at https://arespawn.github.io/WhatsAppToDiscord/#/commands');
@@ -493,7 +499,12 @@ client.on('messageUpdate', async (_, message) => {
 })
 
 client.on('messageDelete', async (message) => {
-  if (message.webhookId != null) {
+  if (!state.settings.DeleteMessages) {
+    return;
+  }
+
+  const waId = state.lastMessages[message.id];
+  if (message.webhookId != null && waId == null) {
     return;
   }
 
@@ -502,7 +513,6 @@ client.on('messageDelete', async (message) => {
     return;
   }
 
-  const waId = state.lastMessages[message.id];
   if (waId == null) {
     await message.channel.send(`Couldn't delete the message. You can only delete the last ${state.settings.lastMessageStorage} messages.`);
     return;

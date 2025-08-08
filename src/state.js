@@ -18,6 +18,7 @@ module.exports = {
     lastMessageStorage: 500,
     oneWay: 0b11,
     redirectWebhooks: false,
+    DeleteMessages: true,
   },
   dcClient: null,
   waClient: null,
