@@ -1,5 +1,6 @@
 node_modules/
 logs.txt
+terminal.log
 storage.db
 downloads/
 *.exe
