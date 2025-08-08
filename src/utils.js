@@ -629,7 +629,13 @@ const whatsapp = {
         largeFile: msg.fileLength.low > 26214400,
       };
     } catch (err) {
-      state.logger?.error(err);
+      if (err?.message?.includes('Unrecognised filter type')) {
+        // Jimp sometimes throws this error when a PNG file is corrupted or malformed.
+        // Avoid spamming the log with a stack trace for such cases.
+        state.logger?.warn('Skipped sending attachment due to an invalid PNG file');
+      } else {
+        state.logger?.error(err);
+      }
       return null;
     }
   },
