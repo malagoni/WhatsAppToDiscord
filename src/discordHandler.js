@@ -196,7 +196,7 @@ client.on('whatsappDelete', async ({ id, jid }) => {
     await utils.discord.safeWebhookEdit(
       webhook,
       messageId,
-      { content: 'Message Delete' },
+      { content: 'Message Deleted' },
       jid,
     );
   } catch (err) {
