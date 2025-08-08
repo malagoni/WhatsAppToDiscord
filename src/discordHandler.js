@@ -17,7 +17,7 @@ const client = new Client({
 let controlChannel;
 const pendingAlbums = {};
 
-const sendWhatsappMessage = async (message, mediaFiles = []) => {
+const sendWhatsappMessage = async (message, mediaFiles = [], messageIds = []) => {
   let msgContent = '';
   const files = [];
   const webhook = await utils.discord.getOrCreateChannel(message.channelJid);
@@ -101,7 +101,12 @@ const sendWhatsappMessage = async (message, mediaFiles = []) => {
     }
 
     if (message.id != null) {
-      // bidirectional map automatically stores both directions
+      const waIds = messageIds.length ? messageIds : [message.id];
+      for (const waId of waIds) {
+        // bidirectional map automatically stores both directions
+        state.lastMessages[waId] = dcMessage.id;
+      }
+      // store mapping for Discord -> first WhatsApp id for edits
       state.lastMessages[dcMessage.id] = message.id;
     }
   }
@@ -112,7 +117,7 @@ const flushAlbum = async (key) => {
   if (!album) return;
   clearTimeout(album.timer);
   delete pendingAlbums[key];
-  await sendWhatsappMessage(album.message, album.files);
+  await sendWhatsappMessage(album.message, album.files, album.ids);
 };
 
 const setControlChannel = async () => {
@@ -144,6 +149,7 @@ client.on('whatsappMessage', async (message) => {
   if (message.file && !message.isEdit) {
     if (pendingAlbums[key]) {
       pendingAlbums[key].files.push(message.file);
+      pendingAlbums[key].ids.push(message.id);
       clearTimeout(pendingAlbums[key].timer);
       pendingAlbums[key].timer = setTimeout(() => flushAlbum(key), 500);
       return;
@@ -151,6 +157,7 @@ client.on('whatsappMessage', async (message) => {
     pendingAlbums[key] = {
       message,
       files: [message.file],
+      ids: [message.id],
       timer: setTimeout(() => flushAlbum(key), 500),
     };
     return;
@@ -195,7 +202,6 @@ client.on('whatsappDelete', async ({ id, jid }) => {
   try {
     await utils.discord.safeWebhookDelete(webhook, messageId, jid);
     delete state.lastMessages[id];
-    delete state.lastMessages[messageId];
   } catch {
     try {
       await utils.discord.safeWebhookEdit(
@@ -549,22 +555,32 @@ client.on('messageDelete', async (message) => {
     return;
   }
 
-  const waId = state.lastMessages[message.id];
-  if (message.webhookId != null && waId == null) {
-    return;
-  }
-
   const jid = utils.discord.channelIdToJid(message.channelId);
   if (jid == null) {
     return;
   }
 
-  if (waId == null) {
+  const waIds = [];
+  for (const [waId, dcId] of Object.entries(state.lastMessages)) {
+    if (dcId === message.id && waId !== message.id) {
+      waIds.push(waId);
+    }
+  }
+
+  if (message.webhookId != null && waIds.length === 0) {
+    return;
+  }
+
+  if (waIds.length === 0) {
     await message.channel.send(`Couldn't delete the message. You can only delete the last ${state.settings.lastMessageStorage} messages.`);
     return;
   }
 
-  state.waClient.ev.emit('discordDelete', { jid, id: waId });
+  for (const waId of waIds) {
+    state.waClient.ev.emit('discordDelete', { jid, id: waId });
+    delete state.lastMessages[waId];
+  }
+  delete state.lastMessages[message.id];
 });
 
 client.on('messageReactionAdd', async (reaction, user) => {
