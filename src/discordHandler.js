@@ -201,7 +201,6 @@ client.on('whatsappDelete', async ({ id, jid }) => {
   const webhook = await utils.discord.getOrCreateChannel(jid);
   try {
     await utils.discord.safeWebhookDelete(webhook, messageId, jid);
-    delete state.lastMessages[id];
   } catch {
     try {
       await utils.discord.safeWebhookEdit(
@@ -214,6 +213,8 @@ client.on('whatsappDelete', async ({ id, jid }) => {
       state.logger?.error(err);
     }
   }
+  delete state.lastMessages[id];
+  delete state.lastMessages[messageId];
 });
 
 client.on('whatsappCall', async ({ call, jid }) => {

@@ -117,14 +117,13 @@ const connectToWhatsApp = async (retry = 1) => {
     });
 
     client.ev.on('messages.delete', async (updates) => {
-        if ('keys' in updates) {
-            for (const key of updates.keys) {
-                if (!utils.whatsapp.inWhitelist({ chatId: key.remoteJid })) continue;
-                state.dcClient.emit('whatsappDelete', {
-                    id: key.id,
-                    jid: utils.whatsapp.formatJid(key.remoteJid),
-                });
-            }
+        const keys = 'keys' in updates ? updates.keys : updates;
+        for (const key of keys) {
+            if (!utils.whatsapp.inWhitelist({ chatId: key.remoteJid })) continue;
+            state.dcClient.emit('whatsappDelete', {
+                id: key.id,
+                jid: utils.whatsapp.formatJid(key.remoteJid),
+            });
         }
     });
 
