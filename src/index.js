@@ -13,7 +13,7 @@ const storage = require('./storage.js');
 const whatsappHandler =  require('./whatsappHandler.js');
 
 (async () => {
-    const version = 'v1.1.22';
+    const version = 'v1.1.23';
   state.version = version;
   const streams = [
     { stream: pino.destination('logs.txt') },
