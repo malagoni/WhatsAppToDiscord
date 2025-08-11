@@ -1,5 +1,5 @@
 const { Webhook, MessageAttachment } = require('discord.js');
-const { downloadMediaMessage } = require('@whiskeysockets/baileys');
+const { downloadMediaMessage, downloadContentFromMessage } = require('@whiskeysockets/baileys');
 const readline = require('readline');
 const QRCode = require('qrcode');
 const crypto = require('crypto');
@@ -10,6 +10,8 @@ const { pipeline } = require('stream/promises');
 const child_process = require('child_process');
 
 const state = require('./state.js');
+
+const DISCORD_FILE_SIZE_LIMIT = 8 * 1024 * 1024; // 8MB webhook upload limit
 
 
 const updater = {
@@ -372,6 +374,14 @@ const discord = {
         };
         return await webhook.send(args);
       }
+      if (err.code === 40005 || err.httpStatus === 413) {
+        const content = `WA2DC Attention: Received a file, but it's over Discord's upload limit. Check WhatsApp on your phone${state.settings.LocalDownloads ? '' : ' or enable local downloads.'}`;
+        return await webhook.send({
+          content,
+          username: args.username,
+          avatarURL: args.avatarURL,
+        });
+      }
       throw err;
     }
   },
@@ -497,6 +507,13 @@ const discord = {
     const [absPath, fileName] = await this.findAvailableName(state.settings.DownloadDir, file.name);
     if (typeof file.attachment?.pipe === 'function') {
       await pipeline(file.attachment, fs.createWriteStream(absPath));
+    } else if (file.downloadCtx) {
+      const stream = await downloadContentFromMessage(
+        file.downloadCtx.message[file.msgType],
+        file.msgType.replace('Message', ''),
+        { logger: state.logger, reuploadRequest: state.waClient.updateMediaMessage },
+      );
+      await pipeline(stream, fs.createWriteStream(absPath));
     } else {
       await fs.promises.writeFile(absPath, file.attachment);
     }
@@ -625,13 +642,25 @@ const whatsapp = {
   async getFile(rawMsg, msgType) {
     const [nMsgType, msg] = this.getMessage(rawMsg, msgType);
     if (msg.fileLength == null) return;
-    if (msg.fileLength.low > 26214400 && !state.settings.LocalDownloads) return -1;
+    const largeFile = msg.fileLength.low > DISCORD_FILE_SIZE_LIMIT;
+    if (largeFile && !state.settings.LocalDownloads) return -1;
     try {
+      if (largeFile && state.settings.LocalDownloads) {
+        return {
+          name: this.getFilename(msg, nMsgType),
+          downloadCtx: rawMsg,
+          msgType: nMsgType,
+          largeFile: true,
+        };
+      }
       return {
         name: this.getFilename(msg, nMsgType),
         // Download media as a stream to avoid buffering entire files in memory
-        attachment: await downloadMediaMessage(rawMsg, 'stream', {}, { logger: state.logger, reuploadRequest: state.waClient.updateMediaMessage }),
-        largeFile: msg.fileLength.low > 26214400,
+        attachment: await downloadMediaMessage(rawMsg, 'stream', {}, {
+          logger: state.logger,
+          reuploadRequest: state.waClient.updateMediaMessage,
+        }),
+        largeFile,
       };
     } catch (err) {
       if (err?.message?.includes('Unrecognised filter type') || err?.message?.includes('Unrecognized filter type')) {
@@ -656,7 +685,7 @@ const whatsapp = {
   sentAfterStart(rawMsg) {
     const ts = this.getTimestamp(rawMsg);
     const id = this.getId(rawMsg);
-    return ts > state.startTime || !Object.prototype.hasOwnProperty.call(state.lastMessages, id);
+    return ts > state.startTime || id == null || !Object.prototype.hasOwnProperty.call(state.lastMessages, id);
   },
   getMessageType(rawMsg) {
     return ['conversation', 'extendedTextMessage', 'imageMessage', 'videoMessage', 'audioMessage', 'documentMessage', 'documentWithCaptionMessage', 'viewOnceMessageV2', 'stickerMessage', 'editedMessage'].find((el) => Object.hasOwn(rawMsg.message || {}, el));
@@ -670,7 +699,9 @@ const whatsapp = {
     return this._profilePicsCache[jid];
   },
   getId(rawMsg) {
-    return rawMsg.message?.editedMessage?.message?.protocolMessage?.key?.id || rawMsg.key.id;
+    return rawMsg?.message?.editedMessage?.message?.protocolMessage?.key?.id
+      || rawMsg?.key?.id
+      || rawMsg?.id;
   },
   getContent(msg, nMsgType, msgType) {
     let content = '';
