@@ -6,7 +6,7 @@ const crypto = require('crypto');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
-const stream = require('stream/promises');
+const { pipeline } = require('stream/promises');
 const child_process = require('child_process');
 
 const state = require('./state.js');
@@ -495,7 +495,11 @@ const discord = {
   async downloadLargeFile(file) {
     await fs.promises.mkdir(state.settings.DownloadDir, { recursive: true });
     const [absPath, fileName] = await this.findAvailableName(state.settings.DownloadDir, file.name);
-    await fs.promises.writeFile(absPath, file.attachment);
+    if (typeof file.attachment?.pipe === 'function') {
+      await pipeline(file.attachment, fs.createWriteStream(absPath));
+    } else {
+      await fs.promises.writeFile(absPath, file.attachment);
+    }
     return this.formatDownloadMessage(absPath, path.resolve(state.settings.DownloadDir), fileName);
   },
   formatDownloadMessage(absPath, resolvedDownloadDir, fileName) {
@@ -625,7 +629,8 @@ const whatsapp = {
     try {
       return {
         name: this.getFilename(msg, nMsgType),
-        attachment: await downloadMediaMessage(rawMsg, 'buffer', {}, { logger: state.logger, reuploadRequest: state.waClient.updateMediaMessage }),
+        // Download media as a stream to avoid buffering entire files in memory
+        attachment: await downloadMediaMessage(rawMsg, 'stream', {}, { logger: state.logger, reuploadRequest: state.waClient.updateMediaMessage }),
         largeFile: msg.fileLength.low > 26214400,
       };
     } catch (err) {
@@ -795,7 +800,7 @@ const requests = {
     });
     if (readable == null) return false;
 
-    return stream.pipeline(readable, fs.createWriteStream(path)).then(() => true).catch((error) => {
+    return pipeline(readable, fs.createWriteStream(path)).then(() => true).catch((error) => {
       state.logger?.error(error);
       return false;
     });
