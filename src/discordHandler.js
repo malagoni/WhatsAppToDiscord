@@ -37,11 +37,7 @@ const sendWhatsappMessage = async (message, mediaFiles = [], messageIds = []) =>
       } else if (message.quote.file === -1 && !state.settings.LocalDownloads) {
         msgContent += "WA2DC Attention: Received a file, but it's over 8MB. Check WhatsApp on your phone or enable local downloads.";
       } else {
-        files.push({
-          attachment: fs.createReadStream(message.quote.file.path),
-          name: message.quote.file.name,
-          tmpPath: message.quote.file.path,
-        });
+        files.push(message.quote.file);
       }
     }
   }
@@ -57,11 +53,7 @@ const sendWhatsappMessage = async (message, mediaFiles = [], messageIds = []) =>
     else if (file === -1 && !state.settings.LocalDownloads) {
       msgContent += "WA2DC Attention: Received a file, but it's over 8MB. Check WhatsApp on your phone or enable local downloads.";
     } else if (file !== -1) {
-      files.push({
-        attachment: fs.createReadStream(file.path),
-        name: file.name,
-        tmpPath: file.path,
-      });
+      files.push(file);
     }
   }
 
@@ -116,9 +108,6 @@ const sendWhatsappMessage = async (message, mediaFiles = [], messageIds = []) =>
       }
       // store mapping for Discord -> first WhatsApp id for edits
       state.lastMessages[dcMessage.id] = message.id;
-    }
-    for (const f of files) {
-      if (f.tmpPath) fs.unlink(f.tmpPath, () => 0);
     }
   }
 };

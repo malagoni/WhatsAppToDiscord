@@ -495,13 +495,7 @@ const discord = {
   async downloadLargeFile(file) {
     await fs.promises.mkdir(state.settings.DownloadDir, { recursive: true });
     const [absPath, fileName] = await this.findAvailableName(state.settings.DownloadDir, file.name);
-    if (file.path) {
-      await fs.promises.copyFile(file.path, absPath);
-      fs.unlink(file.path, () => 0);
-    }
-    else if (file.attachment) {
-      await stream.pipeline(file.attachment, fs.createWriteStream(absPath));
-    }
+    await fs.promises.writeFile(absPath, file.attachment);
     return this.formatDownloadMessage(absPath, path.resolve(state.settings.DownloadDir), fileName);
   },
   formatDownloadMessage(absPath, resolvedDownloadDir, fileName) {
@@ -627,17 +621,12 @@ const whatsapp = {
   async getFile(rawMsg, msgType) {
     const [nMsgType, msg] = this.getMessage(rawMsg, msgType);
     if (msg.fileLength == null) return;
-    const isLarge = msg.fileLength.low > 26214400;
-    if (isLarge && !state.settings.LocalDownloads) return -1;
+    if (msg.fileLength.low > 26214400 && !state.settings.LocalDownloads) return -1;
     try {
-      const fileName = this.getFilename(msg, nMsgType);
-      const tmpPath = path.join(os.tmpdir(), `${crypto.randomUUID()}-${fileName}`);
-      const dlStream = await downloadMediaMessage(rawMsg, 'stream', {}, { logger: state.logger, reuploadRequest: state.waClient.updateMediaMessage });
-      await stream.pipeline(dlStream, fs.createWriteStream(tmpPath));
       return {
-        name: fileName,
-        path: tmpPath,
-        largeFile: isLarge,
+        name: this.getFilename(msg, nMsgType),
+        attachment: await downloadMediaMessage(rawMsg, 'buffer', {}, { logger: state.logger, reuploadRequest: state.waClient.updateMediaMessage }),
+        largeFile: msg.fileLength.low > 26214400,
       };
     } catch (err) {
       if (err?.message?.includes('Unrecognised filter type') || err?.message?.includes('Unrecognized filter type')) {
