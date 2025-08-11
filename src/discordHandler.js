@@ -35,7 +35,7 @@ const sendWhatsappMessage = async (message, mediaFiles = [], messageIds = []) =>
       if (message.quote.file.largeFile && state.settings.LocalDownloads) {
         msgContent += await utils.discord.downloadLargeFile(message.quote.file);
       } else if (message.quote.file === -1 && !state.settings.LocalDownloads) {
-        msgContent += "WA2DC Attention: Received a file, but it's over 8MB. Check WhatsApp on your phone or enable local downloads.";
+        msgContent += "WA2DC Attention: Received a file, but it's over Discord's upload limit. Check WhatsApp on your phone or enable local downloads.";
       } else {
         files.push(message.quote.file);
       }
@@ -51,7 +51,7 @@ const sendWhatsappMessage = async (message, mediaFiles = [], messageIds = []) =>
       msgContent += await utils.discord.downloadLargeFile(file);
     }
     else if (file === -1 && !state.settings.LocalDownloads) {
-      msgContent += "WA2DC Attention: Received a file, but it's over 8MB. Check WhatsApp on your phone or enable local downloads.";
+      msgContent += "WA2DC Attention: Received a file, but it's over Discord's upload limit. Check WhatsApp on your phone or enable local downloads.";
     } else if (file !== -1) {
       files.push(file);
     }
@@ -393,11 +393,11 @@ const commands = {
   },
   async enablelocaldownloads() {
     state.settings.LocalDownloads = true;
-    await controlChannel.send(`Enabled local downloads. You can now download files larger than 8MB.`);
+    await controlChannel.send('Enabled local downloads. You can now download files larger than Discord\'s upload limit.');
   },
   async disablelocaldownloads() {
     state.settings.LocalDownloads = false;
-    await controlChannel.send(`Disabled local downloads. You won't be able to download files larger than 8MB.`);
+    await controlChannel.send('Disabled local downloads. You won\'t be able to download files larger than Discord\'s upload limit.');
   },
   async getdownloadmessage() {
     await controlChannel.send(`Download message format is set to "${state.settings.LocalDownloadMessage}"`);
@@ -412,6 +412,40 @@ const commands = {
   async setdownloaddir(message) {
     state.settings.DownloadDir = message.content.split(' ').slice(1).join(' ');
     await controlChannel.send(`Set download path to "${state.settings.DownloadDir}"`);
+  },
+  async setfilesizelimit(message) {
+    const size = parseInt(message.content.split(' ')[1], 10);
+    if (!Number.isNaN(size) && size > 0) {
+      state.settings.DiscordFileSizeLimit = size;
+      await controlChannel.send(`Set Discord file size limit to ${size} bytes.`);
+    } else {
+      await controlChannel.send('Please provide a valid size in bytes.');
+    }
+  },
+  async enablelocaldownloadserver() {
+    state.settings.LocalDownloadServer = true;
+    await controlChannel.send(`Enabled local download server on port ${state.settings.LocalDownloadServerPort}.`);
+  },
+  async disablelocaldownloadserver() {
+    state.settings.LocalDownloadServer = false;
+    await controlChannel.send('Disabled local download server.');
+  },
+  async setlocaldownloadserverport(_message, params) {
+    const port = parseInt(params[0], 10);
+    if (!Number.isNaN(port) && port > 0 && port <= 65535) {
+      state.settings.LocalDownloadServerPort = port;
+      await controlChannel.send(`Set local download server port to ${port}.`);
+    } else {
+      await controlChannel.send('Please provide a valid port.');
+    }
+  },
+  async setlocaldownloadserverhost(_message, params) {
+    if (params[0]) {
+      state.settings.LocalDownloadServerHost = params[0];
+      await controlChannel.send(`Set local download server host to ${params[0]}.`);
+    } else {
+      await controlChannel.send('Please provide a host name or IP.');
+    }
   },
   async enablepublishing() {
     state.settings.Publish = true;
