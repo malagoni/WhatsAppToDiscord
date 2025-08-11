@@ -7,11 +7,33 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { pipeline } = require('stream/promises');
+const { pathToFileURL } = require('url');
+const http = require('http');
 const child_process = require('child_process');
 
 const state = require('./state.js');
 
-const DISCORD_FILE_SIZE_LIMIT = 8 * 1024 * 1024; // 8MB webhook upload limit
+const downloadTokens = new Map();
+function ensureDownloadServer() {
+  if (!state.settings.LocalDownloadServer || ensureDownloadServer.server) return;
+  ensureDownloadServer.server = http.createServer((req, res) => {
+    const [, token] = req.url.split('/');
+    const filePath = downloadTokens.get(token);
+    if (!filePath) {
+      res.writeHead(404);
+      res.end('Not found');
+      return;
+    }
+    res.setHeader('Content-Disposition', `attachment; filename="${path.basename(filePath)}"`);
+    const stream = fs.createReadStream(filePath);
+    stream.on('error', () => {
+      res.writeHead(500);
+      res.end('Error');
+    });
+    stream.on('close', () => downloadTokens.delete(token));
+    stream.pipe(res);
+  }).listen(state.settings.LocalDownloadServerPort, state.settings.LocalDownloadServerHost);
+}
 
 
 const updater = {
@@ -517,14 +539,29 @@ const discord = {
     } else {
       await fs.promises.writeFile(absPath, file.attachment);
     }
-    return this.formatDownloadMessage(absPath, path.resolve(state.settings.DownloadDir), fileName);
+    ensureDownloadServer();
+    let url;
+    if (state.settings.LocalDownloadServer) {
+      const token = crypto.randomBytes(16).toString('hex');
+      downloadTokens.set(token, absPath);
+      url = `http://${state.settings.LocalDownloadServerHost}:${state.settings.LocalDownloadServerPort}/${token}/${encodeURIComponent(fileName)}`;
+    } else {
+      url = pathToFileURL(absPath).href;
+    }
+    return this.formatDownloadMessage(
+      absPath,
+      path.resolve(state.settings.DownloadDir),
+      fileName,
+      url,
+    );
   },
-  formatDownloadMessage(absPath, resolvedDownloadDir, fileName) {
+  formatDownloadMessage(absPath, resolvedDownloadDir, fileName, url) {
     return state.settings.LocalDownloadMessage
       .replaceAll("{abs}", absPath)
       .replaceAll("{resolvedDownloadDir}", resolvedDownloadDir)
       .replaceAll("{downloadDir}", state.settings.DownloadDir)
       .replaceAll("{fileName}", fileName)
+      .replaceAll("{url}", url)
   }
 };
 
@@ -642,7 +679,10 @@ const whatsapp = {
   async getFile(rawMsg, msgType) {
     const [nMsgType, msg] = this.getMessage(rawMsg, msgType);
     if (msg.fileLength == null) return;
-    const largeFile = msg.fileLength.low > DISCORD_FILE_SIZE_LIMIT;
+    const fileLength = typeof msg.fileLength === 'object'
+      ? msg.fileLength.low ?? msg.fileLength.toNumber()
+      : msg.fileLength;
+    const largeFile = fileLength > state.settings.DiscordFileSizeLimit;
     if (largeFile && !state.settings.LocalDownloads) return -1;
     try {
       if (largeFile && state.settings.LocalDownloads) {

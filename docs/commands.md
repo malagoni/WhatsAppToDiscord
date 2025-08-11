@@ -78,25 +78,25 @@ When disabled, deleting a message on one platform will not affect the other, kee
 - Format: `disableDeletes`
 
 ## enableLocalDownloads
-When enabled, the bot downloads files larger than 8MB to your download location. See `getDownloadDir` for your download location.
+When enabled, the bot downloads files larger than Discord's upload limit (default 8MB) to your download location. See `getDownloadDir` for your download location.
 - Format: `enableLocalDownloads`
 
 ## disableLocalDownloads
-When enabled, the bot notifies you about receiving a file larger than 8MB.
+When enabled, the bot notifies you about receiving a file larger than Discord's upload limit.
 - Format: `disableLocalDownloads`
 
 ## getDownloadMessage
-Prints out the download message. This message is printed when you receive a file larger than 8MB and it is downloaded.
+Prints out the download message. This message is printed when you receive a file larger than Discord's upload limit and it is downloaded.
 - Format: `getDownloadMessage`
-- Default: *"Downloaded a file larger than 8MB, check it out at {abs}"*
+- Default: *"Downloaded a file larger than the upload limit, check it out at {url}"*
 
 ## setDownloadMessage
-Prints out the download message. This message is printed when you receive a file larger than 8MB and it is downloaded. There are keywords that you can use, `{abs}`: Downloaded file's absolute path, `{resolvedDownloadDir}`: Download directory's resolved path, `{downloadDir}`: unedited download directory, `{fileName}`: Downloaded file's name.
+Prints out the download message. This message is printed when you receive a file larger than Discord's upload limit and it is downloaded. There are keywords that you can use, `{abs}`: Downloaded file's absolute path, `{resolvedDownloadDir}`: Download directory's resolved path, `{downloadDir}`: unedited download directory, `{fileName}`: Downloaded file's name, `{url}`: Downloaded file's URL.
 - Format: `setDownloadMessage <your message here>`
 - Examples:
     - `setDownloadMessage Received a file. The file name is {fileName}`
-    - `setDownloadMessage Received a file. Download it from local file server http://localhost:8080/WA2DC/{fileName}`: Note that files aren't hosted by the bot, you'll have to do it yourself if you have such a need.
-    - `setDownloadMessage Received a file. Information: Absolute path: {abs}, Resolved download directory: {resolvedDownloadDir}, Download directory: {downloadDir}, Filename: {fileName}`
+    - `setDownloadMessage Received a file. Download it from {url}`
+    - `setDownloadMessage Received a file. Information: Absolute path: {abs}, Resolved download directory: {resolvedDownloadDir}, Download directory: {downloadDir}, Filename: {fileName}, URL: {url}`
 
 ## getDownloadDir
 Prints out the download directory.
@@ -109,6 +109,29 @@ Sets the download directory.
 - Examples:
     - `setDownloadDir C:\Users\<your username>\Downloads`: Downloads files to your usual Windows downloads folder
     - `setDownloadDir ./downloads`: Downloads files to Downloads folder in your bot's location.
+
+## setFileSizeLimit
+Changes the file size limit used to decide when to download files locally instead of uploading to Discord. Useful for servers with Nitro.
+- Format: `setFileSizeLimit <bytes>`
+- Default: `8388608`
+
+## enableLocalDownloadServer
+Starts a small web server to serve locally downloaded files and makes `{url}` links accessible over HTTP.
+- Format: `enableLocalDownloadServer`
+
+## disableLocalDownloadServer
+Stops the local download server.
+- Format: `disableLocalDownloadServer`
+
+## setLocalDownloadServerHost
+Sets the hostname used in generated download URLs.
+- Format: `setLocalDownloadServerHost <host>`
+- Default: `localhost`
+
+## setLocalDownloadServerPort
+Sets the port for the download server.
+- Format: `setLocalDownloadServerPort <port>`
+- Default: `8080`
 
 ## enablePublishing
 Enables publishing messages sent to news channels automatically. By default, the bot won't notify news channel followers. With this option, you can send the message to the channel followers.
