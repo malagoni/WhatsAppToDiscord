@@ -36,6 +36,19 @@ function ensureDownloadServer() {
     stream.pipe(res);
   };
 
+  const start = (serverFactory) => {
+    try {
+      ensureDownloadServer.server = serverFactory()
+        .on('error', (err) => {
+          state.logger?.error(err);
+          ensureDownloadServer.server = null;
+        });
+    } catch (err) {
+      state.logger?.error(err);
+      ensureDownloadServer.server = null;
+    }
+  };
+
   if (
     state.settings.UseHttps &&
     state.settings.HttpsKeyPath &&
@@ -47,19 +60,31 @@ function ensureDownloadServer() {
       key: fs.readFileSync(state.settings.HttpsKeyPath),
       cert: fs.readFileSync(state.settings.HttpsCertPath),
     };
-    ensureDownloadServer.server = https
-      .createServer(options, handler)
-      .listen(
-        state.settings.LocalDownloadServerPort,
-        state.settings.LocalDownloadServerHost,
-      );
+    start(() =>
+      https
+        .createServer(options, handler)
+        .listen(
+          state.settings.LocalDownloadServerPort,
+          state.settings.LocalDownloadServerHost,
+        )
+    );
   } else {
-    ensureDownloadServer.server = http
-      .createServer(handler)
-      .listen(
-        state.settings.LocalDownloadServerPort,
-        state.settings.LocalDownloadServerHost,
-      );
+    start(() =>
+      http
+        .createServer(handler)
+        .listen(
+          state.settings.LocalDownloadServerPort,
+          state.settings.LocalDownloadServerHost,
+        )
+    );
+  }
+}
+
+function stopDownloadServer() {
+  if (ensureDownloadServer.server) {
+    ensureDownloadServer.server.close();
+    ensureDownloadServer.server = null;
+    downloadTokens.clear();
   }
 }
 
@@ -923,5 +948,10 @@ const ui = {
 };
 
 module.exports = {
-  updater, discord, whatsapp, sqliteToJson
+  updater,
+  discord,
+  whatsapp,
+  sqliteToJson,
+  ensureDownloadServer,
+  stopDownloadServer,
 };

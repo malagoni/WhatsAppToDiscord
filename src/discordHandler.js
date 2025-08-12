@@ -424,16 +424,20 @@ const commands = {
   },
   async enablelocaldownloadserver() {
     state.settings.LocalDownloadServer = true;
+    utils.ensureDownloadServer();
     await controlChannel.send(`Enabled local download server on port ${state.settings.LocalDownloadServerPort}.`);
   },
   async disablelocaldownloadserver() {
     state.settings.LocalDownloadServer = false;
+    utils.stopDownloadServer();
     await controlChannel.send('Disabled local download server.');
   },
   async setlocaldownloadserverport(_message, params) {
     const port = parseInt(params[0], 10);
     if (!Number.isNaN(port) && port > 0 && port <= 65535) {
       state.settings.LocalDownloadServerPort = port;
+      utils.stopDownloadServer();
+      utils.ensureDownloadServer();
       await controlChannel.send(`Set local download server port to ${port}.`);
     } else {
       await controlChannel.send('Please provide a valid port.');
@@ -442,6 +446,8 @@ const commands = {
   async setlocaldownloadserverhost(_message, params) {
     if (params[0]) {
       state.settings.LocalDownloadServerHost = params[0];
+      utils.stopDownloadServer();
+      utils.ensureDownloadServer();
       await controlChannel.send(`Set local download server host to ${params[0]}.`);
     } else {
       await controlChannel.send('Please provide a host name or IP.');
@@ -449,10 +455,14 @@ const commands = {
   },
   async enablehttpsdownloadserver() {
     state.settings.UseHttps = true;
+    utils.stopDownloadServer();
+    utils.ensureDownloadServer();
     await controlChannel.send('Enabled HTTPS for local download server.');
   },
   async disablehttpsdownloadserver() {
     state.settings.UseHttps = false;
+    utils.stopDownloadServer();
+    utils.ensureDownloadServer();
     await controlChannel.send('Disabled HTTPS for local download server.');
   },
   async sethttpscert(_message, params) {
@@ -461,6 +471,8 @@ const commands = {
       return;
     }
     [state.settings.HttpsKeyPath, state.settings.HttpsCertPath] = params;
+    utils.stopDownloadServer();
+    utils.ensureDownloadServer();
     await controlChannel.send(`Set HTTPS key path to ${params[0]} and cert path to ${params[1]}.`);
   },
   async enablepublishing() {

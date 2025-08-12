@@ -13,7 +13,7 @@ const storage = require('./storage.js');
 const whatsappHandler =  require('./whatsappHandler.js');
 
 (async () => {
-    const version = 'v1.1.24';
+    const version = 'v1.1.25';
   state.version = version;
   const streams = [
     { stream: pino.destination('logs.txt') },
@@ -82,6 +82,8 @@ const whatsappHandler =  require('./whatsappHandler.js');
 
   state.settings = await storage.parseSettings();
   state.logger.info('Loaded settings.');
+
+  utils.ensureDownloadServer();
 
   clearInterval(autoSaver);
   autoSaver = setInterval(() => storage.save(), state.settings.autoSaveInterval * 1000);
