@@ -21,7 +21,8 @@ function ensureDownloadServer() {
   const handler = (req, res) => {
     const [, token] = req.url.split('/');
     const filePath = downloadTokens.get(token);
-    if (!filePath) {
+    if (!filePath || !fs.existsSync(filePath)) {
+      downloadTokens.delete(token);
       res.writeHead(404);
       res.end('Not found');
       return;
@@ -32,7 +33,6 @@ function ensureDownloadServer() {
       res.writeHead(500);
       res.end('Error');
     });
-    stream.on('close', () => downloadTokens.delete(token));
     stream.pipe(res);
   };
 
@@ -605,6 +605,9 @@ const discord = {
       if (file.filePath === ignorePath) continue;
       try {
         await fs.promises.unlink(file.filePath);
+        downloadTokens.forEach((fp, t) => {
+          if (fp === file.filePath) downloadTokens.delete(t);
+        });
         total -= file.size;
       } catch {
         /* ignore */
