@@ -110,6 +110,11 @@ Sets the download directory.
     - `setDownloadDir C:\Users\<your username>\Downloads`: Downloads files to your usual Windows downloads folder
     - `setDownloadDir ./downloads`: Downloads files to Downloads folder in your bot's location.
 
+## setDownloadLimit
+Sets the maximum size for the download directory in gigabytes. Older files are removed when the limit is exceeded.
+- Format: `setDownloadLimit <gigabytes>`
+- Default: `0` (unlimited)
+
 ## setFileSizeLimit
 Changes the file size limit used to decide when to download files locally instead of uploading to Discord. Useful for servers with Nitro.
 - Format: `setFileSizeLimit <bytes>`

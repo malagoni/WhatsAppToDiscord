@@ -12,6 +12,7 @@ module.exports = {
     LocalDownloads: false,
     LocalDownloadMessage: 'Downloaded a file larger than the upload limit, check it out at {url}',
     DownloadDir: './downloads',
+    DownloadDirLimitGB: 0,
     DiscordFileSizeLimit: 8 * 1024 * 1024,
     LocalDownloadServer: false,
     LocalDownloadServerHost: 'localhost',
