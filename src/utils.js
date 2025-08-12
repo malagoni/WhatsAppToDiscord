@@ -9,6 +9,7 @@ const path = require('path');
 const { pipeline } = require('stream/promises');
 const { pathToFileURL } = require('url');
 const http = require('http');
+const https = require('https');
 const child_process = require('child_process');
 
 const state = require('./state.js');
@@ -16,7 +17,8 @@ const state = require('./state.js');
 const downloadTokens = new Map();
 function ensureDownloadServer() {
   if (!state.settings.LocalDownloadServer || ensureDownloadServer.server) return;
-  ensureDownloadServer.server = http.createServer((req, res) => {
+
+  const handler = (req, res) => {
     const [, token] = req.url.split('/');
     const filePath = downloadTokens.get(token);
     if (!filePath) {
@@ -32,7 +34,33 @@ function ensureDownloadServer() {
     });
     stream.on('close', () => downloadTokens.delete(token));
     stream.pipe(res);
-  }).listen(state.settings.LocalDownloadServerPort, state.settings.LocalDownloadServerHost);
+  };
+
+  if (
+    state.settings.UseHttps &&
+    state.settings.HttpsKeyPath &&
+    state.settings.HttpsCertPath &&
+    fs.existsSync(state.settings.HttpsKeyPath) &&
+    fs.existsSync(state.settings.HttpsCertPath)
+  ) {
+    const options = {
+      key: fs.readFileSync(state.settings.HttpsKeyPath),
+      cert: fs.readFileSync(state.settings.HttpsCertPath),
+    };
+    ensureDownloadServer.server = https
+      .createServer(options, handler)
+      .listen(
+        state.settings.LocalDownloadServerPort,
+        state.settings.LocalDownloadServerHost,
+      );
+  } else {
+    ensureDownloadServer.server = http
+      .createServer(handler)
+      .listen(
+        state.settings.LocalDownloadServerPort,
+        state.settings.LocalDownloadServerHost,
+      );
+  }
 }
 
 
@@ -544,7 +572,8 @@ const discord = {
     if (state.settings.LocalDownloadServer) {
       const token = crypto.randomBytes(16).toString('hex');
       downloadTokens.set(token, absPath);
-      url = `http://${state.settings.LocalDownloadServerHost}:${state.settings.LocalDownloadServerPort}/${token}/${encodeURIComponent(fileName)}`;
+      const protocol = state.settings.UseHttps ? 'https' : 'http';
+      url = `${protocol}://${state.settings.LocalDownloadServerHost}:${state.settings.LocalDownloadServerPort}/${token}/${encodeURIComponent(fileName)}`;
     } else {
       url = pathToFileURL(absPath).href;
     }

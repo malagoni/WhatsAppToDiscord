@@ -447,6 +447,22 @@ const commands = {
       await controlChannel.send('Please provide a host name or IP.');
     }
   },
+  async enablehttpsdownloadserver() {
+    state.settings.UseHttps = true;
+    await controlChannel.send('Enabled HTTPS for local download server.');
+  },
+  async disablehttpsdownloadserver() {
+    state.settings.UseHttps = false;
+    await controlChannel.send('Disabled HTTPS for local download server.');
+  },
+  async sethttpscert(_message, params) {
+    if (params.length !== 2) {
+      await controlChannel.send('Usage: `setHttpsCert <key> <cert>`');
+      return;
+    }
+    [state.settings.HttpsKeyPath, state.settings.HttpsCertPath] = params;
+    await controlChannel.send(`Set HTTPS key path to ${params[0]} and cert path to ${params[1]}.`);
+  },
   async enablepublishing() {
     state.settings.Publish = true;
     await controlChannel.send(`Enabled publishing messages sent to news channels.`);

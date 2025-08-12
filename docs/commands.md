@@ -133,6 +133,18 @@ Sets the port for the download server.
 - Format: `setLocalDownloadServerPort <port>`
 - Default: `8080`
 
+## enableHttpsDownloadServer
+Serves downloads over HTTPS instead of HTTP. Requires certificate files to be configured.
+- Format: `enableHttpsDownloadServer`
+
+## disableHttpsDownloadServer
+Disables HTTPS for the download server and serves files over HTTP.
+- Format: `disableHttpsDownloadServer`
+
+## setHttpsCert
+Sets the paths for the TLS private key and certificate used by the HTTPS download server.
+- Format: `setHttpsCert <key path> <cert path>`
+
 ## enablePublishing
 Enables publishing messages sent to news channels automatically. By default, the bot won't notify news channel followers. With this option, you can send the message to the channel followers.
 - Format: `enablePublishing`
