@@ -65,7 +65,7 @@ function ensureDownloadServer() {
         .createServer(options, handler)
         .listen(
           state.settings.LocalDownloadServerPort,
-          state.settings.LocalDownloadServerHost,
+          '0.0.0.0',
         )
     );
   } else {
@@ -74,7 +74,7 @@ function ensureDownloadServer() {
         .createServer(handler)
         .listen(
           state.settings.LocalDownloadServerPort,
-          state.settings.LocalDownloadServerHost,
+          '0.0.0.0',
         )
     );
   }
@@ -577,6 +577,40 @@ const discord = {
     } while (await fs.promises.stat(absPath).catch(() => false));
     return [absPath, parsedFName.name + (counter === -1 ? "" : counter) + parsedFName.ext];
   },
+  async pruneDownloadsDir(ignorePath) {
+    const limitGB = state.settings.DownloadDirLimitGB;
+    if (!limitGB || limitGB <= 0) return;
+    const limitBytes = limitGB * 1024 * 1024 * 1024;
+    let entries;
+    try {
+      entries = await fs.promises.readdir(state.settings.DownloadDir);
+    } catch {
+      return;
+    }
+    const files = await Promise.all(
+      entries.map(async (name) => {
+        const filePath = path.join(state.settings.DownloadDir, name);
+        try {
+          const stat = await fs.promises.stat(filePath);
+          return { filePath, mtime: stat.mtimeMs, size: stat.size };
+        } catch {
+          return null;
+        }
+      }),
+    );
+    const validFiles = files.filter(Boolean).sort((a, b) => a.mtime - b.mtime);
+    let total = validFiles.reduce((sum, f) => sum + f.size, 0);
+    for (const file of validFiles) {
+      if (total <= limitBytes) break;
+      if (file.filePath === ignorePath) continue;
+      try {
+        await fs.promises.unlink(file.filePath);
+        total -= file.size;
+      } catch {
+        /* ignore */
+      }
+    }
+  },
   async downloadLargeFile(file) {
     await fs.promises.mkdir(state.settings.DownloadDir, { recursive: true });
     const [absPath, fileName] = await this.findAvailableName(state.settings.DownloadDir, file.name);
@@ -592,6 +626,7 @@ const discord = {
     } else {
       await fs.promises.writeFile(absPath, file.attachment);
     }
+    await this.pruneDownloadsDir(absPath);
     ensureDownloadServer();
     let url;
     if (state.settings.LocalDownloadServer) {

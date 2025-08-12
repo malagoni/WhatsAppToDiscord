@@ -413,6 +413,15 @@ const commands = {
     state.settings.DownloadDir = message.content.split(' ').slice(1).join(' ');
     await controlChannel.send(`Set download path to "${state.settings.DownloadDir}"`);
   },
+  async setdownloadlimit(_message, params) {
+    const gb = parseFloat(params[0]);
+    if (!Number.isNaN(gb) && gb >= 0) {
+      state.settings.DownloadDirLimitGB = gb;
+      await controlChannel.send(`Set download directory size limit to ${gb} GB.`);
+    } else {
+      await controlChannel.send('Please provide a valid size in gigabytes.');
+    }
+  },
   async setfilesizelimit(message) {
     const size = parseInt(message.content.split(' ')[1], 10);
     if (!Number.isNaN(size) && size > 0) {
