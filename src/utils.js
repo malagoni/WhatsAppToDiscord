@@ -380,6 +380,15 @@ const discord = {
   partitionText(text) {
     return text.match(/(.|[\r\n]){1,2000}/g) || [];
   },
+  convertWhatsappFormatting(text = '') {
+    if (!text) return text;
+    let converted = text;
+    converted = converted.replace(/_\*(.+?)\*_/g, '***$1***');
+    converted = converted.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '**$1**');
+    converted = converted.replace(/(?<!_)_(?!_)(.+?)(?<!_)_(?!_)/g, '*$1*');
+    converted = converted.replace(/~(.+?)~/g, '~~$1~~');
+    return converted;
+  },
   async getGuild() {
     return state.dcClient.guilds.fetch(state.settings.GuildID).catch((err) => { state.logger?.error(err) });
   },
@@ -679,6 +688,16 @@ const whatsapp = {
   contacts() {
     return Object.values(state.waClient.contacts);
   },
+  convertDiscordFormatting(text = '') {
+    if (!text) return text;
+    let converted = text;
+    converted = converted.replace(/```(\w+)\n/g, '```\n');
+    converted = converted.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '_$1_');
+    converted = converted.replace(/\*\*\*(.+?)\*\*\*/g, '_*$1*_');
+    converted = converted.replace(/\*\*(.+?)\*\*/g, '*$1*');
+    converted = converted.replace(/~~(.+?)~~/g, '~$1~');
+    return converted;
+  },
   getMentionedJids(text) {
     const mentions = [];
     if (!text) return mentions;
@@ -907,7 +926,7 @@ const whatsapp = {
             : state.waClient.user.id,
           id: state.lastMessages[refMessage.id],
         },
-        message: { conversation: refMessage.content },
+        message: { conversation: this.convertDiscordFormatting(refMessage.content) },
       };
     } catch (err) {
       state.logger?.error(err);

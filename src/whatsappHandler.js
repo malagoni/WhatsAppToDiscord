@@ -210,7 +210,7 @@ const connectToWhatsApp = async (retry = 1) => {
             }
         }
 
-        let text = message.content;
+        let text = utils.whatsapp.convertDiscordFormatting(message.content);
 
         if (state.settings.DiscordPrefix) {
             const prefix = state.settings.DiscordPrefixText || message.member?.nickname || message.author.username;
@@ -282,7 +282,7 @@ const connectToWhatsApp = async (retry = 1) => {
             key.participant = utils.whatsapp.toJid(message.author.username);
         }
 
-        let text = message.content;
+        let text = utils.whatsapp.convertDiscordFormatting(message.content);
         if (state.settings.DiscordPrefix) {
             const prefix = state.settings.DiscordPrefixText || message.member?.nickname || message.author.username;
             text = `*${prefix}*\n${text}`;

@@ -22,15 +22,17 @@ const sendWhatsappMessage = async (message, mediaFiles = [], messageIds = []) =>
   const files = [];
   const webhook = await utils.discord.getOrCreateChannel(message.channelJid);
   const avatarURL = message.profilePic || DEFAULT_AVATAR_URL;
+  const content = utils.discord.convertWhatsappFormatting(message.content);
+  const quoteContent = message.quote ? utils.discord.convertWhatsappFormatting(message.quote.content) : null;
 
   if (message.isGroup && state.settings.WAGroupPrefix) { msgContent += `[${message.name}] `; }
 
   if (message.isForwarded) {
-    msgContent += `forwarded message:\n${(message.content || '').split('\n').join('\n> ')}`;
+    msgContent += `forwarded message:\n${(content || '').split('\n').join('\n> ')}`;
   }
   else if (message.quote) {
-    const qContent = (message.quote.content || '').split('\n').join('\n> ');
-    msgContent += `> ${message.quote.name}: ${qContent}\n${message.content || ''}`;
+    const qContent = (quoteContent || '').split('\n').join('\n> ');
+    msgContent += `> ${message.quote.name}: ${qContent}\n${content || ''}`;
     if (message.quote.file) {
       if (message.quote.file.largeFile && state.settings.LocalDownloads) {
         msgContent += await utils.discord.downloadLargeFile(message.quote.file);
@@ -42,7 +44,7 @@ const sendWhatsappMessage = async (message, mediaFiles = [], messageIds = []) =>
     }
   }
   else {
-    msgContent += message.content;
+    msgContent += content;
   }
 
   for (const file of mediaFiles) {
