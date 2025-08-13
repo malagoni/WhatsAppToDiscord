@@ -92,24 +92,45 @@ const sendWhatsappMessage = async (message, mediaFiles = [], messageIds = []) =>
         avatarURL,
       }, message.channelJid);
     }
-    const dcMessage = await utils.discord.safeWebhookSend(webhook, {
-      content: msgContent.shift() || null,
-      username: message.name,
-      files,
-      avatarURL,
-    }, message.channelJid);
-    if (dcMessage.channel.type === 'GUILD_NEWS' && state.settings.Publish) {
-      await dcMessage.crosspost();
-    }
 
-    if (message.id != null) {
-      const waIds = messageIds.length ? messageIds : [message.id];
-      for (const waId of waIds) {
-        // bidirectional map automatically stores both directions
-        state.lastMessages[waId] = dcMessage.id;
+    const chunkArray = (arr, size) => {
+      const chunks = [];
+      for (let i = 0; i < arr.length; i += size) {
+        chunks.push(arr.slice(i, i + size));
       }
-      // store mapping for Discord -> first WhatsApp id for edits
-      state.lastMessages[dcMessage.id] = message.id;
+      return chunks;
+    };
+
+    const fileChunks = chunkArray(files, 10);
+    const idChunks = chunkArray(messageIds.length ? messageIds : [message.id], 10);
+
+    if (!fileChunks.length) fileChunks.push([]);
+
+    let lastDcMessage;
+    for (let i = 0; i < fileChunks.length; i += 1) {
+      // eslint-disable-next-line no-await-in-loop
+      lastDcMessage = await utils.discord.safeWebhookSend(webhook, {
+        content: i === 0 ? (msgContent.shift() || null) : null,
+        username: message.name,
+        files: fileChunks[i],
+        avatarURL,
+      }, message.channelJid);
+
+      if (i === 0 && lastDcMessage.channel.type === 'GUILD_NEWS' && state.settings.Publish) {
+        // eslint-disable-next-line no-await-in-loop
+        await lastDcMessage.crosspost();
+      }
+
+      if (message.id != null) {
+        for (const waId of idChunks[i] || []) {
+          // bidirectional map automatically stores both directions
+          state.lastMessages[waId] = lastDcMessage.id;
+        }
+        if (i === 0) {
+          // store mapping for Discord -> first WhatsApp id for edits
+          state.lastMessages[lastDcMessage.id] = message.id;
+        }
+      }
     }
   }
 };
