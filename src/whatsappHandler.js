@@ -210,7 +210,13 @@ const connectToWhatsApp = async (retry = 1) => {
             }
         }
 
-        let text = utils.whatsapp.convertDiscordFormatting(message.content);
+        let text = utils.whatsapp.convertDiscordFormatting(message.cleanContent);
+        if (message.reference) {
+            // Discord prepends a mention to replies which results in all
+            // participants being tagged on WhatsApp. Remove the leading
+            // mention so no unintended mass mentions occur.
+            text = text.replace(/^@\S+\s*/, '');
+        }
 
         if (state.settings.DiscordPrefix) {
             const prefix = state.settings.DiscordPrefixText || message.member?.nickname || message.author.username;
@@ -282,7 +288,12 @@ const connectToWhatsApp = async (retry = 1) => {
             key.participant = utils.whatsapp.toJid(message.author.username);
         }
 
-        let text = utils.whatsapp.convertDiscordFormatting(message.content);
+        let text = utils.whatsapp.convertDiscordFormatting(message.cleanContent);
+        if (message.reference) {
+            // Remove Discord's automatic reply mention to avoid tagging
+            // every participant on WhatsApp when editing a reply.
+            text = text.replace(/^@\S+\s*/, '');
+        }
         if (state.settings.DiscordPrefix) {
             const prefix = state.settings.DiscordPrefixText || message.member?.nickname || message.author.username;
             text = `*${prefix}*\n${text}`;
