@@ -758,6 +758,7 @@ const whatsapp = {
     const file = await this.getFile(downloadCtx, qMsgType);
 
     return {
+      id: msg.contextInfo.stanzaId,
       name: this.jidToName(msg.contextInfo.participant || ''),
       content,
       file,

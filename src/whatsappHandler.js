@@ -229,6 +229,7 @@ const connectToWhatsApp = async (retry = 1) => {
                     try {
                         const m = await client.sendMessage(jid, doc, options);
                         state.lastMessages[message.id] = m.key.id;
+                        state.lastMessages[m.key.id] = message.id;
                         state.sentMessages.add(m.key.id);
                     } catch (err) {
                         state.logger?.error(err);
@@ -238,6 +239,7 @@ const connectToWhatsApp = async (retry = 1) => {
                     try {
                         const m = await client.sendMessage(jid, doc);
                         state.lastMessages[message.id] = m.key.id;
+                        state.lastMessages[m.key.id] = message.id;
                         state.sentMessages.add(m.key.id);
                     } catch (err) {
                         state.logger?.error(err);
@@ -261,6 +263,7 @@ const connectToWhatsApp = async (retry = 1) => {
         try {
             const sent = await client.sendMessage(jid, content, options);
             state.lastMessages[message.id] = sent.key.id;
+            state.lastMessages[sent.key.id] = message.id;
             state.sentMessages.add(sent.key.id);
         } catch (err) {
             state.logger?.error(err);
