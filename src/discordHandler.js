@@ -24,6 +24,7 @@ const sendWhatsappMessage = async (message, mediaFiles = [], messageIds = []) =>
   const avatarURL = message.profilePic || DEFAULT_AVATAR_URL;
   const content = utils.discord.convertWhatsappFormatting(message.content);
   const quoteContent = message.quote ? utils.discord.convertWhatsappFormatting(message.quote.content) : null;
+  const replyId = message.quote ? state.lastMessages[message.quote.id] : null;
 
   if (message.isGroup && state.settings.WAGroupPrefix) { msgContent += `[${message.name}] `; }
 
@@ -31,15 +32,19 @@ const sendWhatsappMessage = async (message, mediaFiles = [], messageIds = []) =>
     msgContent += `forwarded message:\n${(content || '').split('\n').join('\n> ')}`;
   }
   else if (message.quote) {
-    const qContent = (quoteContent || '').split('\n').join('\n> ');
-    msgContent += `> ${message.quote.name}: ${qContent}\n${content || ''}`;
-    if (message.quote.file) {
-      if (message.quote.file.largeFile && state.settings.LocalDownloads) {
-        msgContent += await utils.discord.downloadLargeFile(message.quote.file);
-      } else if (message.quote.file === -1 && !state.settings.LocalDownloads) {
-        msgContent += "WA2DC Attention: Received a file, but it's over Discord's upload limit. Check WhatsApp on your phone or enable local downloads.";
-      } else {
-        files.push(message.quote.file);
+    if (replyId) {
+      msgContent += content;
+    } else {
+      const qContent = (quoteContent || '').split('\n').join('\n> ');
+      msgContent += `> ${message.quote.name}: ${qContent}\n${content || ''}`;
+      if (message.quote.file) {
+        if (message.quote.file.largeFile && state.settings.LocalDownloads) {
+          msgContent += await utils.discord.downloadLargeFile(message.quote.file);
+        } else if (message.quote.file === -1 && !state.settings.LocalDownloads) {
+          msgContent += "WA2DC Attention: Received a file, but it's over Discord's upload limit. Check WhatsApp on your phone or enable local downloads.";
+        } else {
+          files.push(message.quote.file);
+        }
       }
     }
   }
@@ -109,12 +114,16 @@ const sendWhatsappMessage = async (message, mediaFiles = [], messageIds = []) =>
     let lastDcMessage;
     for (let i = 0; i < fileChunks.length; i += 1) {
       // eslint-disable-next-line no-await-in-loop
-      lastDcMessage = await utils.discord.safeWebhookSend(webhook, {
+      const sendArgs = {
         content: i === 0 ? (msgContent.shift() || null) : null,
         username: message.name,
         files: fileChunks[i],
         avatarURL,
-      }, message.channelJid);
+      };
+      if (i === 0 && replyId) {
+        sendArgs.reply = { messageReference: replyId };
+      }
+      lastDcMessage = await utils.discord.safeWebhookSend(webhook, sendArgs, message.channelJid);
 
       if (i === 0 && lastDcMessage.channel.type === 'GUILD_NEWS' && state.settings.Publish) {
         // eslint-disable-next-line no-await-in-loop
