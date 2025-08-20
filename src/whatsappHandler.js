@@ -106,10 +106,17 @@ const connectToWhatsApp = async (retry = 1) => {
             if (!utils.whatsapp.inWhitelist(rawReaction) || !utils.whatsapp.sentAfterStart(rawReaction))
                 return;
 
+            const msgId = utils.whatsapp.getId(rawReaction);
+            if (state.sentReactions.has(msgId)) {
+                state.sentReactions.delete(msgId);
+                continue;
+            }
+
             state.dcClient.emit('whatsappReaction', {
-                id: utils.whatsapp.getId(rawReaction),
+                id: msgId,
                 jid: utils.whatsapp.getChannelJid(rawReaction),
                 text: rawReaction.reaction.text,
+                author: utils.whatsapp.getSenderJid(rawReaction, rawReaction.key.fromMe),
             });
             const ts = utils.whatsapp.getTimestamp(rawReaction);
             if (ts > state.startTime) state.startTime = ts;
@@ -129,6 +136,14 @@ const connectToWhatsApp = async (retry = 1) => {
 
     client.ev.on('messages.update', async (updates) => {
         for (const { update, key } of updates) {
+            if (typeof update.status !== 'undefined' && key.fromMe &&
+                [baileys.WAMessageStatus.READ, baileys.WAMessageStatus.PLAYED].includes(update.status)) {
+                state.dcClient.emit('whatsappRead', {
+                    id: key.id,
+                    jid: utils.whatsapp.formatJid(key.remoteJid),
+                });
+            }
+
             const protocol = update.message?.protocolMessage;
             const isDelete =
                 protocol?.type === baileys.proto.Message.ProtocolMessage.Type.REVOKE ||
@@ -176,6 +191,20 @@ const connectToWhatsApp = async (retry = 1) => {
                 isForwarded: false,
                 file: removed ? null : await client.profilePictureUrl(contact.id, 'image').catch(() => null),
             });
+        }
+    });
+
+    client.ev.on('presence.update', async ({ id, presences }) => {
+        if (!utils.whatsapp.inWhitelist({ chatId: id })) return;
+        for (const presence of Object.values(presences)) {
+            const isTyping = ['composing', 'recording'].includes(presence?.lastKnownPresence);
+            if (isTyping) {
+                state.dcClient.emit('whatsappTyping', {
+                    jid: utils.whatsapp.formatJid(id),
+                    isTyping: true,
+                });
+                break;
+            }
         }
     });
 
@@ -343,6 +372,7 @@ const connectToWhatsApp = async (retry = 1) => {
             const messageId = reactionMsg.key.id;
             state.lastMessages[messageId] = true;
             state.sentMessages.add(messageId);
+            state.sentReactions.add(key.id);
         } catch (err) {
             state.logger?.error(err);
         }

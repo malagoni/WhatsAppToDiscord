@@ -77,6 +77,22 @@ When enabled (enabled by default), deleting a message on one platform removes it
 When disabled, deleting a message on one platform will not affect the other, keeping the history.
 - Format: `disableDeletes`
 
+## enableReadReceipts
+Enables read receipts so you are notified when WhatsApp users read your messages.
+- Format: `enableReadReceipts`
+
+## disableReadReceipts
+Disables read receipts.
+- Format: `disableReadReceipts`
+
+## dmReadReceipts
+Sends read receipts as direct messages to the original Discord author instead of in the channel.
+- Format: `dmReadReceipts`
+
+## publicReadReceipts
+Posts a short reply in the channel when a WhatsApp message is read (auto-deletes after a few seconds).
+- Format: `publicReadReceipts`
+
 ## enableLocalDownloads
 When enabled, the bot downloads files larger than Discord's upload limit (default 8MB) to your download location. See `getDownloadDir` for your download location.
 - Format: `enableLocalDownloads`

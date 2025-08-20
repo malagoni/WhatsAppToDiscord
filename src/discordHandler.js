@@ -16,6 +16,8 @@ const client = new Client({
 });
 let controlChannel;
 const pendingAlbums = {};
+const typingTimeouts = {};
+const deliveredMessages = new Set();
 
 const sendWhatsappMessage = async (message, mediaFiles = [], messageIds = []) => {
   let msgContent = '';
@@ -171,6 +173,23 @@ client.on('channelDelete', async (channel) => {
   }
 });
 
+client.on('typingStart', async (typing) => {
+  if ((state.settings.oneWay >> 1 & 1) === 0) { return; }
+  const { channel } = typing;
+  const jid = utils.discord.channelIdToJid(channel.id);
+  if (!jid) { return; }
+  if (!state.waClient) { return; }
+  try {
+    await state.waClient.sendPresenceUpdate('composing', jid);
+    clearTimeout(typingTimeouts[jid]);
+    typingTimeouts[jid] = setTimeout(() => {
+      state.waClient.sendPresenceUpdate('paused', jid).catch(() => {});
+    }, 5000);
+  } catch (err) {
+    state.logger?.error(err);
+  }
+});
+
 client.on('whatsappMessage', async (message) => {
   if ((state.settings.oneWay >> 0 & 1) === 0) {
     return;
@@ -213,11 +232,51 @@ client.on('whatsappReaction', async (reaction) => {
 
   const channel = await utils.discord.getChannel(channelId);
   const message = await channel.messages.fetch(messageId);
-  await message.react(reaction.text).catch(async err => {
-    if (err.code === 10014) {
-      await channel.send(`Unknown emoji reaction (${reaction.text}) received. Check WhatsApp app to see it.`);
+  const msgReactions = state.reactions[messageId] || (state.reactions[messageId] = {});
+  const prev = msgReactions[reaction.author];
+  if (prev) {
+    await message.reactions.cache.get(prev)?.remove().catch(() => {});
+    delete msgReactions[reaction.author];
+  }
+  if (reaction.text) {
+    await message.react(reaction.text).catch(async err => {
+      if (err.code === 10014) {
+        await channel.send(`Unknown emoji reaction (${reaction.text}) received. Check WhatsApp app to see it.`);
+      }
+    });
+    msgReactions[reaction.author] = reaction.text;
+  }
+  if (!Object.keys(msgReactions).length) {
+    delete state.reactions[messageId];
+  }
+});
+
+client.on('whatsappTyping', async ({ jid, isTyping }) => {
+  if ((state.settings.oneWay >> 0 & 1) === 0) { return; }
+  const channelId = state.chats[jid]?.channelId;
+  if (!channelId || !isTyping) { return; }
+  const channel = await utils.discord.getChannel(channelId);
+  channel.sendTyping().catch(() => {});
+});
+
+client.on('whatsappRead', async ({ id, jid }) => {
+  if ((state.settings.oneWay >> 0 & 1) === 0 || !state.settings.ReadReceipts) { return; }
+  const channelId = state.chats[jid]?.channelId;
+  const messageId = state.lastMessages[id];
+  if (!channelId || !messageId || deliveredMessages.has(messageId)) { return; }
+  deliveredMessages.add(messageId);
+  const channel = await utils.discord.getChannel(channelId);
+  const message = await channel.messages.fetch(messageId).catch(() => null);
+  if (!message) { return; }
+  if (state.settings.ReadReceiptMode === 'dm') {
+    const name = utils.whatsapp.jidToName(jid);
+    message.author.send(`✅ Your message to ${name} was read`).catch(() => {});
+  } else {
+    const receipt = await channel.send({ content: '✅ Read', reply: { messageReference: messageId } }).catch(() => null);
+    if (receipt) {
+      setTimeout(() => receipt.delete().catch(() => {}), 5000);
     }
-  });
+  }
 });
 
 client.on('whatsappDelete', async ({ id, jid }) => {
@@ -404,6 +463,22 @@ const commands = {
   async disabledeletes() {
     state.settings.DeleteMessages = false;
     await controlChannel.send('Disabled message delete syncing!');
+  },
+  async enablereadreceipts() {
+    state.settings.ReadReceipts = true;
+    await controlChannel.send('Enabled read receipts!');
+  },
+  async disablereadreceipts() {
+    state.settings.ReadReceipts = false;
+    await controlChannel.send('Disabled read receipts!');
+  },
+  async dmreadreceipts() {
+    state.settings.ReadReceiptMode = 'dm';
+    await controlChannel.send('Read receipts will be sent via DM.');
+  },
+  async publicreadreceipts() {
+    state.settings.ReadReceiptMode = 'public';
+    await controlChannel.send('Read receipts will be posted publicly.');
   },
   async help() {
     await controlChannel.send('See all the available commands at https://arespawn.github.io/WhatsAppToDiscord/#/commands');
@@ -700,7 +775,15 @@ client.on('messageReactionAdd', async (reaction, user) => {
   if (user.id === state.dcClient.user.id) {
     return;
   }
-
+  const selfJid = state.waClient?.user?.id && utils.whatsapp.formatJid(state.waClient.user.id);
+  if (selfJid && state.reactions[reaction.message.id]?.[selfJid]) {
+    const prev = state.reactions[reaction.message.id][selfJid];
+    await reaction.message.reactions.cache.get(prev)?.remove().catch(() => {});
+    delete state.reactions[reaction.message.id][selfJid];
+    if (!Object.keys(state.reactions[reaction.message.id]).length) {
+      delete state.reactions[reaction.message.id];
+    }
+  }
   state.waClient.ev.emit('discordReaction', { jid, reaction, removed: false });
 });
 
@@ -717,7 +800,15 @@ client.on('messageReactionRemove', async (reaction, user) => {
   if (user.id === state.dcClient.user.id) {
     return;
   }
-
+  const selfJid = state.waClient?.user?.id && utils.whatsapp.formatJid(state.waClient.user.id);
+  if (selfJid && state.reactions[reaction.message.id]?.[selfJid]) {
+    const prev = state.reactions[reaction.message.id][selfJid];
+    await reaction.message.reactions.cache.get(prev)?.remove().catch(() => {});
+    delete state.reactions[reaction.message.id][selfJid];
+    if (!Object.keys(state.reactions[reaction.message.id]).length) {
+      delete state.reactions[reaction.message.id];
+    }
+  }
   state.waClient.ev.emit('discordReaction', { jid, reaction, removed: true });
 });
 
