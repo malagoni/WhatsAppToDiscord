@@ -750,6 +750,10 @@ client.on('messageDelete', async (message) => {
     return;
   }
 
+  if (message.author?.id === client.user.id) {
+    return;
+  }
+
   if (waIds.length === 0) {
     await message.channel.send(`Couldn't delete the message. You can only delete the last ${state.settings.lastMessageStorage} messages.`);
     return;
