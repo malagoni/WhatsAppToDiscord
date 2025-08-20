@@ -473,6 +473,10 @@ const discord = {
     try {
       return await webhook.editMessage(messageId, args);
     } catch (err) {
+      if (err.code === 10008 && err.message.includes('Unknown Message')) {
+        // message was already deleted or never existed
+        return null;
+      }
       if (err.code === 10015 && err.message.includes('Unknown Webhook')) {
         delete state.goccRuns[jid];
         const channel = await this.getChannel(state.chats[jid].channelId);
@@ -492,6 +496,10 @@ const discord = {
     try {
       return await webhook.deleteMessage(messageId);
     } catch (err) {
+      if (err.code === 10008 && err.message.includes('Unknown Message')) {
+        // message was already removed, treat as success
+        return null;
+      }
       if (err.code === 10015 && err.message.includes('Unknown Webhook')) {
         delete state.goccRuns[jid];
         const channel = await this.getChannel(state.chats[jid].channelId);
