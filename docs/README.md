@@ -6,7 +6,7 @@ Originally created by [Fatih Kilic](https://github.com/FKLC), now maintained by 
 
 ## Requirements
 
-- Node.js 18 or higher
+- Node.js 20 or higher
 
 ## Features
 

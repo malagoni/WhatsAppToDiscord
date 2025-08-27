@@ -5,7 +5,7 @@
 # installing nodejs 
 
 #pull node setup
-curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 # install nodejs
 sudo apt-get install -y nodejs
 # clone the git

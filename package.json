@@ -11,7 +11,7 @@
   "repository": "https://github.com/arespawn/WhatsAppToDiscord",
   "license": "MIT",
   "engines": {
-    "node": ">=18"
+    "node": ">=20"
   },
   "dependencies": {
     "@adiwajshing/keyed-db": "^0.2.4",

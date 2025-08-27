@@ -46,7 +46,7 @@ The bot is built publicly on [GitHub actions](https://github.com/arespawn/WhatsA
     1. `git clone https://github.com/arespawn/WhatsAppToDiscord.git`
     1. `cd WhatsAppToDiscord` 
 1. Run `npm i` to install dependencies
-1. Run `./node_modules/.bin/esbuild ./src/index.js --bundle --platform=node --external:sharp --external:qrcode-terminal --external:jimp --external:link-preview-js --target=node18 --outfile=out.js` to create a single JS file
+1. Run `./node_modules/.bin/esbuild ./src/index.js --bundle --platform=node --external:sharp --external:qrcode-terminal --external:jimp --external:link-preview-js --target=node20 --outfile=out.js` to create a single JS file
 1. Run one of the following commands based on your platform:
     - For x64 Linux: `./node_modules/.bin/pkg out.js -t latest-linux-x64 --options no-warnings -o build/WA2DC-Linux`
     - For x64 MacOS: `./node_modules/.bin/pkg out.js -t latest-macos-x64 --options no-warnings -o build/WA2DC-macOS`
