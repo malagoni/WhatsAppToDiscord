@@ -44,6 +44,13 @@ docker compose up -d
 The compose file mounts the `storage` directory so data is kept between
 container restarts.
 
+### Automatic updates
+
+A pre-built Docker image is published to the GitHub Container Registry on every push to `main`.
+The included compose file uses this image and adds a [Watchtower](https://github.com/containrrr/watchtower)
+service that checks for new versions every few minutes and restarts the bot
+when an update is available.
+
 ---
 
 For setup and commands, check out the [documentation](https://arespawn.github.io/WhatsAppToDiscord/)!

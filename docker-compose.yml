@@ -1,9 +1,17 @@
 name: wa2dc
 services:
   wa2dc:
-    build: .
+    image: ghcr.io/arespawn/whatsapptodiscord:latest
+    container_name: wa2dc
     volumes:
       - ./storage:/usr/local/WA2DC/storage
     env_file:
       - .env
     restart: unless-stopped
+
+  watchtower:
+    image: containrrr/watchtower
+    restart: unless-stopped
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    command: --interval 300 wa2dc
