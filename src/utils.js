@@ -738,39 +738,50 @@ const whatsapp = {
     return rawMsg.key.participant != null;
   },
   isForwarded(msg) {
-    return msg.contextInfo?.isForwarded;
+    return msg?.contextInfo?.isForwarded;
   },
   isQuoted(msg) {
-    return msg.contextInfo?.quotedMessage;
+    return msg?.contextInfo?.quotedMessage;
   },
   async getQuote(rawMsg) {
     const msgType = this.getMessageType(rawMsg);
     const [, msg] = this.getMessage(rawMsg, msgType);
 
-    if (!this.isQuoted(msg)) return null;
+    if (!msgType || !msg) return null;
 
-    const qMsg = msg.contextInfo.quotedMessage;
+    const context = msg.contextInfo;
+    const qMsg = context?.quotedMessage;
+    if (!qMsg) return null;
+
     const qMsgType = this.getMessageType({ message: qMsg });
 
     const [nMsgType, message] = this.getMessage({ message: qMsg }, qMsgType);
     const content = this.getContent(message, nMsgType, qMsgType);
-    const downloadCtx = {
-      key: {
-        remoteJid: rawMsg.key.remoteJid,
-        id: msg.contextInfo.stanzaId,
-        fromMe: rawMsg.key.fromMe,
-        participant: msg.contextInfo.participant,
-      },
-      message: qMsg,
-    };
-    const file = await this.getFile(downloadCtx, qMsgType);
+    let file = null;
+    if (qMsgType && context?.stanzaId) {
+      const downloadCtx = {
+        key: {
+          remoteJid: rawMsg.key.remoteJid,
+          id: context.stanzaId,
+          fromMe: rawMsg.key.fromMe,
+          participant: context.participant,
+        },
+        message: qMsg,
+      };
+      file = await this.getFile(downloadCtx, qMsgType);
+    }
 
-    return {
-      id: msg.contextInfo.stanzaId,
-      name: this.jidToName(msg.contextInfo.participant || ''),
+    const quote = {
+      name: this.jidToName(context?.participant || ''),
       content,
       file,
     };
+
+    if (context?.stanzaId) {
+      quote.id = context.stanzaId;
+    }
+
+    return quote;
   },
   getMessage(rawMsg, msgType) {
     if (msgType === 'documentWithCaptionMessage') {
@@ -868,6 +879,9 @@ const whatsapp = {
     if (msgType === 'viewOnceMessageV2') {
       content += 'View once message:\n';
     }
+    if (msg == null) {
+      return content;
+    }
     switch (nMsgType) {
       case 'conversation':
         content += msg;
@@ -884,7 +898,8 @@ const whatsapp = {
         content += msg.caption || '';
         break;
     }
-    const mentions = msg.contextInfo?.mentionedJid || [];
+    const contextInfo = typeof msg === 'object' && msg !== null ? msg.contextInfo : undefined;
+    const mentions = contextInfo?.mentionedJid || [];
     for (const jid of mentions) {
       const name = this.jidToName(jid);
       const regex = new RegExp(`@${this.jidToPhone(jid)}\\b`, 'g');
