@@ -26,9 +26,6 @@ const sendWhatsappMessage = async (message, mediaFiles = [], messageIds = []) =>
   const avatarURL = message.profilePic || DEFAULT_AVATAR_URL;
   const content = utils.discord.convertWhatsappFormatting(message.content);
   const quoteContent = message.quote ? utils.discord.convertWhatsappFormatting(message.quote.content) : null;
-  const quoteKey = message.quote?.id;
-  const replyId = quoteKey ? state.lastMessages[quoteKey] : null;
-  const hasReplyTarget = Boolean(replyId);
 
   if (message.isGroup && state.settings.WAGroupPrefix) { msgContent += `[${message.name}] `; }
 
@@ -36,40 +33,36 @@ const sendWhatsappMessage = async (message, mediaFiles = [], messageIds = []) =>
     msgContent += `forwarded message:\n${(content || '').split('\n').join('\n> ')}`;
   }
   else if (message.quote) {
-    if (!hasReplyTarget) {
-      const lines = [];
+    const lines = [];
 
-      const qContentRaw = quoteContent ?? '';
-      const qContent = qContentRaw ? qContentRaw.split('\n').join('\n> ') : '';
-      if (message.quote.name || qContent) {
-        let quoteLine = '> ';
-        if (message.quote.name) {
-          quoteLine += message.quote.name;
-          quoteLine += qContent ? ': ' : ':';
-        }
-        if (qContent) {
-          quoteLine += qContent;
-        }
-        lines.push(quoteLine.trimEnd());
+    const qContentRaw = quoteContent ?? '';
+    const qContent = qContentRaw ? qContentRaw.split('\n').join('\n> ') : '';
+    if (message.quote.name || qContent) {
+      let quoteLine = '> ';
+      if (message.quote.name) {
+        quoteLine += message.quote.name;
+        quoteLine += qContent ? ': ' : ':';
       }
+      if (qContent) {
+        quoteLine += qContent;
+      }
+      lines.push(quoteLine.trimEnd());
+    }
 
-      let segment = lines.join('\n');
-      if (content) {
-        segment += (segment ? '\n' : '') + content;
-      }
-      msgContent += segment || content || '';
+    let segment = lines.join('\n');
+    if (content) {
+      segment += (segment ? '\n' : '') + content;
+    }
+    msgContent += segment || content || '';
 
-      if (message.quote.file) {
-        if (message.quote.file.largeFile && state.settings.LocalDownloads) {
-          msgContent += await utils.discord.downloadLargeFile(message.quote.file);
-        } else if (message.quote.file === -1 && !state.settings.LocalDownloads) {
-          msgContent += "WA2DC Attention: Received a file, but it's over Discord's upload limit. Check WhatsApp on your phone or enable local downloads.";
-        } else {
-          files.push(message.quote.file);
-        }
+    if (message.quote.file) {
+      if (message.quote.file.largeFile && state.settings.LocalDownloads) {
+        msgContent += await utils.discord.downloadLargeFile(message.quote.file);
+      } else if (message.quote.file === -1 && !state.settings.LocalDownloads) {
+        msgContent += "WA2DC Attention: Received a file, but it's over Discord's upload limit. Check WhatsApp on your phone or enable local downloads.";
+      } else {
+        files.push(message.quote.file);
       }
-    } else {
-      msgContent += content;
     }
   }
   else {
@@ -144,24 +137,6 @@ const sendWhatsappMessage = async (message, mediaFiles = [], messageIds = []) =>
         files: fileChunks[i],
         avatarURL,
       };
-      if (i === 0 && replyId) {
-        const baseAllowed = webhook._wa2dcAllowedMentions || state.dcClient?.options?.allowedMentions;
-        const cloneArray = (value) => (Array.isArray(value) ? [...value] : value);
-        const allowedMentions = baseAllowed
-          ? {
-            ...baseAllowed,
-            parse: cloneArray(baseAllowed.parse),
-            roles: cloneArray(baseAllowed.roles),
-            users: cloneArray(baseAllowed.users),
-          }
-          : {};
-        allowedMentions.repliedUser = false;
-        sendArgs.allowedMentions = allowedMentions;
-        sendArgs.reply = {
-          messageReference: replyId,
-          failIfNotExists: false,
-        };
-      }
       lastDcMessage = await utils.discord.safeWebhookSend(webhook, sendArgs, message.channelJid);
 
       if (i === 0 && lastDcMessage.channel.type === 'GUILD_NEWS' && state.settings.Publish) {
