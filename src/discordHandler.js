@@ -26,7 +26,8 @@ const sendWhatsappMessage = async (message, mediaFiles = [], messageIds = []) =>
   const avatarURL = message.profilePic || DEFAULT_AVATAR_URL;
   const content = utils.discord.convertWhatsappFormatting(message.content);
   const quoteContent = message.quote ? utils.discord.convertWhatsappFormatting(message.quote.content) : null;
-  const replyId = message.quote ? state.lastMessages[message.quote.id] : null;
+  const quoteKey = message.quote?.id;
+  const replyId = quoteKey ? state.lastMessages[quoteKey] : null;
 
   if (message.isGroup && state.settings.WAGroupPrefix) { msgContent += `[${message.name}] `; }
 
@@ -710,6 +711,19 @@ client.on('messageUpdate', async (_, message) => {
     return;
   }
 
+  if (message.partial) {
+    try {
+      await message.fetch();
+    } catch (err) {
+      state.logger?.warn(err);
+      return;
+    }
+  }
+
+  if (message.editedTimestamp == null) {
+    return;
+  }
+
   const jid = utils.discord.channelIdToJid(message.channelId);
   if (jid == null) {
     return;
@@ -727,7 +741,7 @@ client.on('messageUpdate', async (_, message) => {
   }
 
   state.waClient.ev.emit('discordEdit', { jid, message });
-})
+});
 
 client.on('messageDelete', async (message) => {
   if (!state.settings.DeleteMessages) {
