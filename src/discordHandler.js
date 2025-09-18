@@ -282,7 +282,35 @@ client.on('whatsappRead', async ({ id, jid }) => {
   if (!message) { return; }
   if (state.settings.ReadReceiptMode === 'dm') {
     const name = utils.whatsapp.jidToName(jid);
-    message.author.send(`✅ Your message to ${name} was read`).catch(() => {});
+    const messageContent = (message.cleanContent ?? message.content ?? '').trim();
+    let quote = null;
+
+    if (messageContent) {
+      const truncated = messageContent.length > 1800 ? `${messageContent.slice(0, 1797)}...` : messageContent;
+      quote = truncated
+        .split('\n')
+        .map((line) => `> ${line || ' '}`)
+        .join('\n');
+    } else if (message.attachments?.size) {
+      const attachments = [...message.attachments.values()].map((attachment) => attachment.name || attachment.url);
+      const [firstAttachment, ...restAttachments] = attachments;
+      quote = `> [Attachment] ${firstAttachment}`;
+      if (restAttachments.length) {
+        quote += `\n> ... (${restAttachments.length} more attachment${restAttachments.length === 1 ? '' : 's'})`;
+      }
+    } else {
+      quote = '> *(No text content)*';
+    }
+
+    const receiptLines = [`✅ Your message to ${name} was read.`];
+    if (quote) {
+      receiptLines.push('', quote);
+    }
+    if (message.url) {
+      receiptLines.push('', message.url);
+    }
+
+    message.author.send(receiptLines.join('\n')).catch(() => {});
   } else {
     const receipt = await channel.send({ content: '✅ Read', reply: { messageReference: messageId } }).catch(() => null);
     if (receipt) {
