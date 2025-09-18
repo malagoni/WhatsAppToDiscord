@@ -15,6 +15,53 @@ const child_process = require('child_process');
 const state = require('./state.js');
 
 const downloadTokens = new Map();
+
+function ensureWebhookReplySupport(webhook) {
+  if (!webhook) return webhook;
+  if (webhook.messages && typeof webhook.messages.resolveId === 'function') {
+    return webhook;
+  }
+
+  const cloneArray = (value) => (Array.isArray(value) ? [...value] : value);
+  webhook.messages = {
+    resolveId(reference) {
+      if (!reference) return null;
+      if (typeof reference === 'string' || typeof reference === 'number') {
+        return String(reference);
+      }
+      if (typeof reference === 'object') {
+        if ('id' in reference && reference.id) {
+          return String(reference.id);
+        }
+        if ('message_id' in reference && reference.message_id) {
+          return String(reference.message_id);
+        }
+        if ('messageId' in reference && reference.messageId) {
+          return String(reference.messageId);
+        }
+        if ('message' in reference && reference.message?.id) {
+          return String(reference.message.id);
+        }
+      }
+      return null;
+    },
+  };
+
+  if (webhook.client && webhook.client.options) {
+    const { allowedMentions } = webhook.client.options;
+    if (allowedMentions) {
+      webhook._wa2dcAllowedMentions = {
+        ...allowedMentions,
+        parse: cloneArray(allowedMentions.parse),
+        roles: cloneArray(allowedMentions.roles),
+        users: cloneArray(allowedMentions.users),
+      };
+    }
+  }
+
+  return webhook;
+}
+
 function ensureDownloadServer() {
   if (!state.settings.LocalDownloadServer || ensureDownloadServer.server) return;
 
@@ -418,7 +465,7 @@ const discord = {
       resolve = res;
     });
     if (state.chats[jid]) {
-      const webhook = new Webhook(state.dcClient, state.chats[jid]);
+      const webhook = ensureWebhookReplySupport(new Webhook(state.dcClient, state.chats[jid]));
       resolve(webhook);
       return webhook;
     }
@@ -431,7 +478,7 @@ const discord = {
       }
       throw err;
     });
-    const webhook = await channel.createWebhook('WA2DC');
+    const webhook = ensureWebhookReplySupport(await channel.createWebhook('WA2DC'));
     state.chats[jid] = {
       id: webhook.id,
       type: webhook.type,
@@ -449,7 +496,7 @@ const discord = {
       if (err.code === 10015 && err.message.includes('Unknown Webhook')) {
         delete state.goccRuns[jid];
         const channel = await this.getChannel(state.chats[jid].channelId);
-        webhook = await channel.createWebhook('WA2DC');
+        webhook = ensureWebhookReplySupport(await channel.createWebhook('WA2DC'));
         state.chats[jid] = {
           id: webhook.id,
           type: webhook.type,
@@ -480,7 +527,7 @@ const discord = {
       if (err.code === 10015 && err.message.includes('Unknown Webhook')) {
         delete state.goccRuns[jid];
         const channel = await this.getChannel(state.chats[jid].channelId);
-        webhook = await channel.createWebhook('WA2DC');
+        webhook = ensureWebhookReplySupport(await channel.createWebhook('WA2DC'));
         state.chats[jid] = {
           id: webhook.id,
           type: webhook.type,
@@ -503,7 +550,7 @@ const discord = {
       if (err.code === 10015 && err.message.includes('Unknown Webhook')) {
         delete state.goccRuns[jid];
         const channel = await this.getChannel(state.chats[jid].channelId);
-        webhook = await channel.createWebhook('WA2DC');
+        webhook = ensureWebhookReplySupport(await channel.createWebhook('WA2DC'));
         state.chats[jid] = {
           id: webhook.id,
           type: webhook.type,

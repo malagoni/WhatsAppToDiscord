@@ -28,6 +28,7 @@ const sendWhatsappMessage = async (message, mediaFiles = [], messageIds = []) =>
   const quoteContent = message.quote ? utils.discord.convertWhatsappFormatting(message.quote.content) : null;
   const quoteKey = message.quote?.id;
   const replyId = quoteKey ? state.lastMessages[quoteKey] : null;
+  const hasReplyTarget = Boolean(replyId);
 
   if (message.isGroup && state.settings.WAGroupPrefix) { msgContent += `[${message.name}] `; }
 
@@ -35,11 +36,29 @@ const sendWhatsappMessage = async (message, mediaFiles = [], messageIds = []) =>
     msgContent += `forwarded message:\n${(content || '').split('\n').join('\n> ')}`;
   }
   else if (message.quote) {
-    if (replyId) {
-      msgContent += content;
-    } else {
-      const qContent = (quoteContent || '').split('\n').join('\n> ');
-      msgContent += `> ${message.quote.name}: ${qContent}\n${content || ''}`;
+    if (!hasReplyTarget) {
+      const lines = [];
+
+      const qContentRaw = quoteContent ?? '';
+      const qContent = qContentRaw ? qContentRaw.split('\n').join('\n> ') : '';
+      if (message.quote.name || qContent) {
+        let quoteLine = '> ';
+        if (message.quote.name) {
+          quoteLine += message.quote.name;
+          quoteLine += qContent ? ': ' : ':';
+        }
+        if (qContent) {
+          quoteLine += qContent;
+        }
+        lines.push(quoteLine.trimEnd());
+      }
+
+      let segment = lines.join('\n');
+      if (content) {
+        segment += (segment ? '\n' : '') + content;
+      }
+      msgContent += segment || content || '';
+
       if (message.quote.file) {
         if (message.quote.file.largeFile && state.settings.LocalDownloads) {
           msgContent += await utils.discord.downloadLargeFile(message.quote.file);
@@ -49,6 +68,8 @@ const sendWhatsappMessage = async (message, mediaFiles = [], messageIds = []) =>
           files.push(message.quote.file);
         }
       }
+    } else {
+      msgContent += content;
     }
   }
   else {
@@ -124,7 +145,22 @@ const sendWhatsappMessage = async (message, mediaFiles = [], messageIds = []) =>
         avatarURL,
       };
       if (i === 0 && replyId) {
-        sendArgs.reply = { messageReference: replyId };
+        const baseAllowed = webhook._wa2dcAllowedMentions || state.dcClient?.options?.allowedMentions;
+        const cloneArray = (value) => (Array.isArray(value) ? [...value] : value);
+        const allowedMentions = baseAllowed
+          ? {
+            ...baseAllowed,
+            parse: cloneArray(baseAllowed.parse),
+            roles: cloneArray(baseAllowed.roles),
+            users: cloneArray(baseAllowed.users),
+          }
+          : {};
+        allowedMentions.repliedUser = false;
+        sendArgs.allowedMentions = allowedMentions;
+        sendArgs.reply = {
+          messageReference: replyId,
+          failIfNotExists: false,
+        };
       }
       lastDcMessage = await utils.discord.safeWebhookSend(webhook, sendArgs, message.channelJid);
 
