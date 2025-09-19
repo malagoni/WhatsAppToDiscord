@@ -85,6 +85,8 @@ Enables read receipts so you are notified when WhatsApp users read your messages
 Disables read receipts.
 - Format: `disableReadReceipts`
 
+Only one delivery style can be active at a time. Use the following commands to switch between DM, public reply, or reaction-based read receipts. Webhook-authored Discord messages always receive a ☑️ reaction whenever read receipts are enabled so they can be acknowledged without sending DMs.
+
 ## dmReadReceipts
 Sends read receipts as direct messages to the original Discord author instead of in the channel.
 - Format: `dmReadReceipts`
@@ -92,6 +94,10 @@ Sends read receipts as direct messages to the original Discord author instead of
 ## publicReadReceipts
 Posts a short reply in the channel when a WhatsApp message is read (auto-deletes after a few seconds).
 - Format: `publicReadReceipts`
+
+## reactionReadReceipts
+Adds a ☑️ reaction to the original Discord message when the WhatsApp user reads it.
+- Format: `reactionReadReceipts`
 
 ## enableLocalDownloads
 When enabled, the bot downloads files larger than Discord's upload limit (default 8MB) to your download location. See `getDownloadDir` for your download location.
