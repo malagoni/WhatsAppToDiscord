@@ -280,7 +280,14 @@ client.on('whatsappRead', async ({ id, jid }) => {
   const channel = await utils.discord.getChannel(channelId);
   const message = await channel.messages.fetch(messageId).catch(() => null);
   if (!message) { return; }
-  if (state.settings.ReadReceiptMode === 'dm') {
+  const receiptMode = state.settings.ReadReceiptMode;
+
+  if (message.webhookId) {
+    await message.react('☑️').catch(() => {});
+    return;
+  }
+
+  if (receiptMode === 'dm') {
     const name = utils.whatsapp.jidToName(jid);
     const messageContent = (message.cleanContent ?? message.content ?? '').trim();
     let quote = null;
@@ -311,11 +318,17 @@ client.on('whatsappRead', async ({ id, jid }) => {
     }
 
     message.author.send(receiptLines.join('\n')).catch(() => {});
-  } else {
-    const receipt = await channel.send({ content: '✅ Read', reply: { messageReference: messageId } }).catch(() => null);
-    if (receipt) {
-      setTimeout(() => receipt.delete().catch(() => {}), 5000);
-    }
+    return;
+  }
+
+  if (receiptMode === 'reaction') {
+    await message.react('☑️').catch(() => {});
+    return;
+  }
+
+  const receipt = await channel.send({ content: '✅ Read', reply: { messageReference: messageId } }).catch(() => null);
+  if (receipt) {
+    setTimeout(() => receipt.delete().catch(() => {}), 5000);
   }
 });
 
@@ -519,6 +532,10 @@ const commands = {
   async publicreadreceipts() {
     state.settings.ReadReceiptMode = 'public';
     await controlChannel.send('Read receipts will be posted publicly.');
+  },
+  async reactionreadreceipts() {
+    state.settings.ReadReceiptMode = 'reaction';
+    await controlChannel.send('Read receipts will be added as ☑️ reactions.');
   },
   async help() {
     await controlChannel.send('See all the available commands at https://arespawn.github.io/WhatsAppToDiscord/#/commands');
@@ -824,12 +841,23 @@ client.on('messageReactionAdd', async (reaction, user) => {
   if (jid == null) {
     return;
   }
+  const isBotUser = user?.id === state.dcClient?.user?.id;
+  if (
+    isBotUser
+    && reaction.emoji?.name === '☑️'
+    && (
+      reaction.message.webhookId != null
+      || deliveredMessages.has(reaction.message.id)
+    )
+  ) {
+    return;
+  }
   const messageId = state.lastMessages[reaction.message.id];
   if (messageId == null) {
     await reaction.message.channel.send(`Couldn't send the reaction. You can only react to last ${state.settings.lastMessageStorage} messages.`);
     return;
   }
-  if (user.id === state.dcClient.user.id) {
+  if (isBotUser) {
     return;
   }
   const selfJid = state.waClient?.user?.id && utils.whatsapp.formatJid(state.waClient.user.id);
@@ -849,12 +877,23 @@ client.on('messageReactionRemove', async (reaction, user) => {
   if (jid == null) {
     return;
   }
+  const isBotUser = user?.id === state.dcClient?.user?.id;
+  if (
+    isBotUser
+    && reaction.emoji?.name === '☑️'
+    && (
+      reaction.message.webhookId != null
+      || deliveredMessages.has(reaction.message.id)
+    )
+  ) {
+    return;
+  }
   const messageId = state.lastMessages[reaction.message.id];
   if (messageId == null) {
     await reaction.message.channel.send(`Couldn't remove the reaction. You can only react to last ${state.settings.lastMessageStorage} messages.`);
     return;
   }
-  if (user.id === state.dcClient.user.id) {
+  if (isBotUser) {
     return;
   }
   const selfJid = state.waClient?.user?.id && utils.whatsapp.formatJid(state.waClient.user.id);
