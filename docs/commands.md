@@ -192,7 +192,7 @@ Usage: `/newsletterdelete confirm:<true> jid:[...@newsletter]`
 
 ### `/newsletterurlfallback`
 
-Toggle the temporary plain-URL fallback for newsletter image/video attachments. It is disabled by default. When disabled, unsupported media is skipped with an explanation; other attachment types are not sent to newsletters.
+Send newsletter image/video attachments as plain links instead of uploading them. Disabled by default, so images and videos upload as media. Other attachment types are skipped with an explanation.
 
 Usage: `/newsletterurlfallback enabled:<true|false>`
 
@@ -251,6 +251,20 @@ Usage: `/waplatformsuffix enabled:<true|false>`
 Hide WhatsApp phone numbers on Discord, using stable pseudonyms when a real contact name is unavailable.
 
 Usage: `/hidephonenumbers enabled:<true|false>`
+
+### `/setavatar`
+
+Use a custom image for a WhatsApp contact's future Discord messages, including in groups and forum threads. Accepts a contact name, number with country code, or PN/LID JID. The override survives restarts and does not change the contact's WhatsApp picture or previously sent messages.
+
+Provide a direct HTTPS image URL that stays accessible. Temporary Discord attachment links can expire; WA2DC stores the URL and does not host or copy the image.
+
+Usage: `/setavatar contact:<name, number, or JID> url:<HTTPS image URL>`
+
+### `/resetavatar`
+
+Remove a contact's custom Discord avatar and use their WhatsApp profile picture again for future messages, or the default avatar when no picture is available.
+
+Usage: `/resetavatar contact:<name, number, or JID>`
 
 ### `/linkmention`
 

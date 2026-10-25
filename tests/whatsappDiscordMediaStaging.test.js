@@ -216,6 +216,75 @@ test("a retry reuses staged files without downloading WhatsApp media again", asy
 	}
 });
 
+test("text-only sends log retry failures and the fallback but not routine success", async () => {
+	const originalLogger = state.logger;
+	const { logger, entries } = captureLogger();
+	const sentContents = [];
+
+	try {
+		state.logger = logger;
+		const result = await utils.discord.safeWebhookSend(
+			{
+				async send(args) {
+					sentContents.push(args.content);
+					if (sentContents.length <= 3) {
+						const error = new Error(
+							"aborted https://discord.com/api/webhooks/id/private-token",
+						);
+						error.name = "AbortError";
+						throw error;
+					}
+					return { id: "dc-text-fallback" };
+				},
+			},
+			{ content: "private message" },
+			"private-jid@s.whatsapp.net",
+		);
+
+		assert.equal(result.id, "dc-text-fallback");
+		assert.equal(sentContents.length, 4);
+		assert.match(
+			sentContents[3],
+			/Discord failed to upload after 3 attempts\. Please check WhatsApp/u,
+		);
+		assert.deepEqual(
+			entries.map(({ level, metadata, message }) => [
+				level,
+				metadata.outcome,
+				metadata.attachmentCount,
+				message,
+			]),
+			[
+				...[1, 2, 3].map(() => [
+					"warn",
+					"retryable-failure",
+					0,
+					"Discord webhook send attempt completed.",
+				]),
+				["error", "fallback", 0, "Discord webhook send attempt completed."],
+			],
+		);
+		assert.doesNotMatch(
+			JSON.stringify(entries),
+			/private-token|private-jid|private message/iu,
+		);
+
+		entries.length = 0;
+		await utils.discord.safeWebhookSend(
+			{
+				async send() {
+					return { id: "dc-text" };
+				},
+			},
+			{ content: "routine message" },
+			"private-jid@s.whatsapp.net",
+		);
+		assert.deepEqual(entries, []);
+	} finally {
+		state.logger = originalLogger;
+	}
+});
+
 test("partial staging failure uploads remaining files with an explicit notice", async () => {
 	const temporaryParent = await createTemporaryParent();
 	const originalLimit = state.settings.DiscordFileSizeLimit;
@@ -264,9 +333,12 @@ test("partial staging failure uploads remaining files with an explicit notice", 
 test("total staging failure preserves text and sends the check-WhatsApp fallback", async () => {
 	const temporaryParent = await createTemporaryParent();
 	const originalLimit = state.settings.DiscordFileSizeLimit;
+	const originalLogger = state.logger;
+	const { logger, entries } = captureLogger();
 	let sentArgs;
 
 	try {
+		state.logger = logger;
 		state.settings.DiscordFileSizeLimit = 1024;
 		await utils.discord.safeWebhookSend(
 			{
@@ -283,47 +355,78 @@ test("total staging failure preserves text and sends the check-WhatsApp fallback
 			{
 				temporaryDirectory: temporaryParent,
 				downloadWhatsAppMedia() {
-					throw new Error("synthetic download failure");
+					throw new TypeError("fetch failed: private media URL", {
+						cause: Object.assign(new Error("private DNS hostname"), {
+							code: "ENOTFOUND",
+						}),
+					});
 				},
 			},
 		);
 
 		assert.deepEqual(sentArgs.files, []);
+		const failures = entries.filter((entry) => entry.level === "warn");
+		assert.equal(failures.length, 2);
+		for (const { metadata } of failures) {
+			assert.equal(metadata.errorCode, "TypeError");
+			assert.equal(metadata.causeErrorCode, "ENOTFOUND");
+		}
+		assert.doesNotMatch(JSON.stringify(entries), /private|hostname|URL/u);
 		assert.match(sentArgs.content, /caption must survive/u);
 		assert.match(
 			sentArgs.content,
 			/Please check WhatsApp for the original message/u,
 		);
 	} finally {
+		state.logger = originalLogger;
 		state.settings.DiscordFileSizeLimit = originalLimit;
 		await cleanupActiveWhatsAppDiscordMediaStaging();
 		await removeTemporaryParent(temporaryParent);
 	}
 });
 
-test("staging rejects actual-size overflow and enforces a per-attachment timeout", async () => {
+test("staging rejects actual-size overflow", async () => {
 	const temporaryParent = await createTemporaryParent();
 	try {
 		assert.equal(WHATSAPP_DISCORD_MEDIA_DOWNLOAD_TIMEOUT_MS, 60_000);
 		const staged = await stageWhatsAppDiscordAttachments(
-			[lazyAttachment(1, 5), lazyAttachment(2, 5)],
+			[lazyAttachment(1, 5)],
 			{
 				maxBytes: 10,
-				timeoutMs: 25,
 				temporaryDirectory: temporaryParent,
-				download(file) {
-					if (file.downloadCtx.index === 1) {
-						return Readable.from([Buffer.alloc(11)]);
-					}
-					return new Readable({ read() {} });
-				},
+				download: () => Readable.from([Buffer.alloc(11)]),
 			},
 		);
 
 		assert.deepEqual(staged.files, []);
 		assert.deepEqual(
 			staged.failures.map((failure) => failure.code),
-			["WA2DC_MEDIA_ACTUAL_SIZE_OVERFLOW", "WA2DC_MEDIA_DOWNLOAD_TIMEOUT"],
+			["WA2DC_MEDIA_ACTUAL_SIZE_OVERFLOW"],
+		);
+		assert.equal(staged.stagedBytes, 0);
+		await staged.cleanup();
+	} finally {
+		await cleanupActiveWhatsAppDiscordMediaStaging();
+		await removeTemporaryParent(temporaryParent);
+	}
+});
+
+test("staging enforces a per-attachment timeout", async () => {
+	const temporaryParent = await createTemporaryParent();
+	try {
+		const staged = await stageWhatsAppDiscordAttachments(
+			[lazyAttachment(1, 5)],
+			{
+				maxBytes: 10,
+				timeoutMs: 25,
+				temporaryDirectory: temporaryParent,
+				download: () => new Readable({ read() {} }),
+			},
+		);
+		assert.deepEqual(staged.files, []);
+		assert.deepEqual(
+			staged.failures.map((failure) => failure.code),
+			["WA2DC_MEDIA_DOWNLOAD_TIMEOUT"],
 		);
 		assert.equal(staged.stagedBytes, 0);
 		await staged.cleanup();

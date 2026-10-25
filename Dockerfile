@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM node:24-bookworm-slim AS deps
+FROM node:24.22.1-bookworm-slim AS deps
 WORKDIR /usr/local/WA2DC
 RUN apt-get update \
 	&& apt-get install -y --no-install-recommends \
@@ -22,7 +22,7 @@ COPY --chown=node:node scripts/patchBaileysAndroidBrowser.js ./scripts/patchBail
 USER node
 RUN npm ci --omit=dev
 
-FROM node:24-bookworm-slim
+FROM node:24.22.1-bookworm-slim
 WORKDIR /usr/local/WA2DC
 RUN apt-get update \
 	&& apt-get install -y --no-install-recommends \
@@ -38,7 +38,9 @@ RUN apt-get update \
 
 COPY --from=deps --chown=node:node /usr/local/WA2DC/node_modules ./node_modules
 COPY --chown=node:node package*.json ./
-COPY --chown=node:node . .
+COPY --chown=node:node src/ ./src/
+COPY --chown=node:node scripts/docker-entrypoint.sh scripts/patchBaileysAndroidBrowser.js ./scripts/
+COPY --chown=node:node LICENSE.txt ./LICENSE.txt
 RUN chmod +x /usr/local/WA2DC/scripts/docker-entrypoint.sh
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \

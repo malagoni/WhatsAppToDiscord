@@ -30,6 +30,30 @@ WA2DC processes Discord tokens, WhatsApp authentication material, contact identi
 - The local download server defaults to loopback. Binding publicly requires explicit operator configuration; path-safe signed URLs do not replace authentication, firewalling, TLS, expiry, or reverse-proxy controls.
 - Do not introduce new outbound services, analytics, or telemetry without explicit documentation and operator control.
 
+## Runtime and certificate security
+
+Treat the Node.js runtime and its certificate trust store as part of each WA2DC distribution:
+
+- Source installations use the Node.js executable that launches the watchdog and worker. Updating another Node.js installation on the host does not update the service's runtime.
+- Packaged executables embed Node.js independently of the build host and operator's installed Node.js. Host certificate-store updates and `NODE_OPTIONS` overrides must not be assumed to change a packaged executable's effective trust.
+- Containers include their own runtime and trust store. Operators must pull or rebuild a patched image and recreate the container.
+
+For the October 2026 eMudhra certificate compromise, Node.js 24.22.1 includes the upstream certificate-blocking fix. Use a current security release on a supported Node.js line. When patched packaged artifacts are unavailable, operators can retain their stable application tag and lockfile while using a patched source runtime. Follow the [source conversion procedure](../setup.md#move-a-packaged-installation-to-source).
+
+Validate the actual distribution and launch environment with anonymous HTTPS requests to the incident's diagnostic hosts and normal HTTPS positive controls. Require certificate verification to fail for the affected chains across native HTTPS, built-in fetch, Undici, and the Discord REST agent; never disable TLS verification or attach credentials to a diagnostic request. A successful smoke boot alone does not prove certificate rejection or live transport reconnection. Keep operator logs, backups, and deployment evidence private.
+
+References: [incident advisory](https://emudhra.we-have-a-problem.com/) and [Node.js 24.22.1 release](https://github.com/nodejs/node/releases/tag/v24.22.1).
+
+### Temporary application distrust
+
+`loadTlsTrust.js` runs first in both `runner.js` and `index.js`, including spawned packaged workers. Node.js 24.22.1, 26.12.1, and later supported releases use their native compromised-key blocklist, preserving existing trust configuration. For older embedded runtimes, the fallback uses Node's supported TLS API to replace the default CA list after removing the eight compromised intermediate public keys and all four affected trust-anchor keys. Matching SHA-256 fingerprints of DER SPKIs also removes alternate/cross-signed certificates with the same keys. Normal startup makes no blocklist network request.
+
+The fallback retains unrelated bundled, system, and extra CAs returned by `tls.getCACertificates("default")`. A missing filtering API, malformed CA, empty resulting trust store, or failed verification of the installed CA list stops startup on older runtimes. OpenSSL's implicit CA mode is not fully enumerable through this API; on those older runtimes use bundled/system CA mode and `NODE_EXTRA_CA_CERTS` for additional roots. Explicit per-connection `ca` / `secureContext` options bypass the fallback default store and must not be introduced without applying the same policy. Worker threads performing TLS on older runtimes would also need this initialization. Patched source runtimes retain their native protection with OpenSSL and per-connection trust options.
+
+`WA2DC_TLS_TRUST_CHECK=1 node src/runner.js` runs anonymous checks and exits before starting the watchdog or opening persistent state. For a packaged executable, set the same variable and run that executable. The check contacts the two advisory diagnostic hosts plus Discord and WhatsApp HTTPS positive controls through native HTTPS, built-in fetch, Undici, and the actual Discord REST agent. Only certificate-validation rejection counts as a negative-test success; DNS failures and timeouts fail the check. It sends no application credentials or message content and prints only runtime details, public hostnames, status/error codes, and pass/fail results. Keep these online checks separate from the network-free test suite.
+
+This mitigation covers the known certificate paths and may reject legitimate sites that rely exclusively on the removed roots. It does not replace runtime security updates. Remove it only after verifying that every supported packaged runtime rejects the compromised keys itself.
+
 ## Authorization
 
 WA2DC intentionally uses Discord's guild, channel, role, and application-command permissions. Keep the control channel private and do not imply per-user authorization exists in WA2DC.

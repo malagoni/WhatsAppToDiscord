@@ -31,7 +31,7 @@ The official Docker entrypoint starts `src/index.js` directly and relies on the 
 - Preserve memory probes around socket creation, connection, genuine initial-buffer flushes, and LID migration. They diagnose packaged startup rollback/OOM failures.
 - Fresh sessions default to the Android browser profile for view-once behavior. Pairing-code flows may temporarily select a Chrome profile; changing the profile of a registered session can require clearing WhatsApp auth and pairing again.
 - Prefer `fetchLatestWaWebVersion()` for fresh pairing, falling back to `fetchLatestBaileysVersion()` only when the live lookup fails.
-- Keep the pinned-Baileys postinstall patch synchronized with its tests. It covers the Android profile, disabled-history buffering, delivered receipts while unavailable, pre-auth/incomplete pairing notifications, LID migration probes, and bounded tctoken pruning.
+- Keep the pinned-Baileys postinstall patch synchronized with its tests. It covers newsletter image/video upload metadata, obsolete Web/Desktop media-host fallback, the Android profile, disabled-history buffering, delivered receipts while unavailable, pre-auth/incomplete pairing notifications, companion registration QR refresh, LID migration probes, and bounded tctoken pruning.
 
 ## Module ownership
 
@@ -40,6 +40,7 @@ Runtime and configuration:
 - `src/runner.js` / `src/runnerLogic.js`: supervision, restart/backoff, restart flags, and automatic packaged rollback
 - `src/index.js`: worker bootstrap, autosave, crash reports, and platform lifecycle
 - `src/runtimeEnvironment.js`: `.env` path and loading semantics
+- `src/tlsTrust.js` / `src/loadTlsTrust.js`: startup certificate distrust policy; `src/tlsTrustCheck.js` provides the opt-in anonymous TLS diagnostic
 - `src/contracts.js`: settings defaults/normalization, one-way modes, browser-profile values, Discord permissions, and newsletter timing constants
 - `src/state.js`: mutable in-memory runtime state
 
@@ -60,6 +61,9 @@ Transports and normalization:
 - `src/groupMetadataCache.js` / `src/groupMetadataRefresh.js`: bounded metadata caching and scheduled refresh
 - `src/pollUtils.js`: WhatsApp poll option and encryption-key extraction
 - `src/internal/`: sticker, image, GIF, and audio send/receive normalization
+- `src/internal/ffmpeg.js`: shared FFmpeg pipe, timeout, error, and buffer cleanup for the three audio/GIF conversion paths; codec arguments and fallback decisions remain in their normalizers
+- `src/internal/attachmentBuffer.js`: bounded attachment stream reads and shared Discord audio/sticker loading
+- `src/internal/expiringCache.js`: fixed-TTL caches with one unreferenced expiry timer per cache, using a monotonic clock
 - `src/utils.js`: transport helpers, mentions, link previews, download server, updater, file delivery, and JID migration helpers
 - `src/processErrors.js` / `src/processExitReporting.js` / `src/shutdown.js`: tightly identified Undici transport failures remain non-fatal across both process error events; other failures retain bounded exit/crash reporting, cleanup, and watchdog escalation
 
@@ -77,6 +81,13 @@ Transports and normalization:
 - Packaged build and smoke: `npm run build:bin:smoke`
 - Worker smoke: `WA2DC_SMOKE_TEST=1 node src/index.js`
 - Signal smoke: `WA2DC_SMOKE_TEST=1 WA2DC_SMOKE_WAIT_FOR_SIGNAL=1 node src/runner.js`, then send `SIGINT`
+- Synthetic optimization benchmark: `node scripts/benchmark.js` after building both bundles; runs use temporary SQLite databases and skip external transports
+
+Newsletter pending sends, acknowledgement errors, and message diagnostics retain their existing TTLs. One lazy, unreferenced maintenance timer sweeps inactive keys every 30 seconds and stops when these maps are empty. Group metadata maintenance also removes expired refresh-throttle entries. Download-directory pruning scans at most 32 file stats concurrently before applying the existing age, size, and free-space rules.
+
+Discord forward-context, message-location, quoted-location and lookup-miss caches retain their existing TTLs and keep one timer per cache rather than one per entry. Refreshes move entries to the end of expiry order without reducing quote retention. Receipt/reaction state and pin-expiry timers are released for deleted messages even when forwarding deletions is disabled. Sender/reaction echo trackers retain their event-consumption semantics so delayed WhatsApp echoes remain suppressed.
+
+Lottie rendering reuses its compiled bootstrap but creates a fresh window and animation for each sticker. Player timers belong to that window and are cancelled when it closes, including setup failures. Animated PNG frames are resized and encoded directly into the final WebP with their existing frame order and timing, without an intermediate lossy WebP round trip.
 
 ## Packaged runtime model
 

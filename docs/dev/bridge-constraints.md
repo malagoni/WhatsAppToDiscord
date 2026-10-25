@@ -46,13 +46,18 @@ Managed forum hosts are selected by configured name and a bot-owner marker in th
 - Translate individual mentions only from real platform mention metadata; do not interpret arbitrary typed `@name` text.
 - Respect `DiscordFileSizeLimit` and local-download fallback behavior.
 
+Custom Discord avatars resolve from the sender JID, including group participants, before the WhatsApp profile-picture cache. Keep overrides separate from that cache so removing an override restores normal WhatsApp lookup. PN/LID migrations must carry avatar settings with the other contact state.
+
 ## Media delivery
 
+- When a WhatsApp media message has a `directPath`, the pinned-Baileys patch replaces obsolete `a.whatsapp.net` / `web.whatsapp.net` URL hosts with Baileys' default media host. Preserve explicit host overrides, other URL hosts, and URL-only downloads. See [upstream PR #2778](https://github.com/WhiskeySockets/Baileys/pull/2778).
 - Bound WhatsApp-to-Discord attachment batches with `WhatsAppDiscordMediaBurstSize`; never exceed Discord's 10-file upload limit.
 - Keep ordinary WhatsApp media lazy until Discord send time. Stage attachments sequentially into private temporary files, enforce `DiscordFileSizeLimit` against actual bytes, and retry from those replayable files instead of reopening WhatsApp streams.
 - Apply a 60-second timeout to each WhatsApp media download and to Discord REST requests. A failed attachment must not discard successful siblings: upload the remainder with a notice, or preserve the message text and emit the check-WhatsApp fallback when none can be staged.
+- Propagate download cancellation to the HTTP request and destroy the HTTP source when its decrypt stream closes or fails. The pinned Baileys patch owns that stream lifecycle and cancels unused error-response bodies.
+- GIF and opted-in MP3 conversions enforce the configured upload limit while reading input and collecting converted output. Oversized converted output falls back to the original media; oversized input follows the normal local-download/size-notice policy. Discord audio and sticker HTTP reads enforce their existing 25 MiB and 8 MiB limits while streaming and cancel unused bodies.
 - Keep `@discordjs/rest` on its native request/response strategy and give both the main client and standalone stored-webhook clients a shared, explicit Undici 6 agent. The process also loads newer Undici majors through link preview handling; allowing those packages to replace the global dispatcher underneath Discord REST can leave multipart bodies unsent. Record WhatsApp↔Discord mappings before attempting announcement-channel crossposts, and run crossposts as error-contained follow-up work so publication delays cannot suppress mappings or block later bridge messages.
-- Retry transient Discord upload failures from Undici and Node HTTP/2 streams, then emit a fallback notice instead of silently dropping media. Upload diagnostics may include counts, byte totals, durations, attempts, and outcomes, but never message content, sender IDs, or webhook tokens.
+- Retry transient Discord upload failures from Undici and Node HTTP/2 streams, then emit a fallback notice instead of silently dropping media. Upload diagnostics may include counts, byte totals, durations, attempts, outcomes, and bounded error/cause codes, but never message content, sender IDs, or webhook tokens. Log retries and fallbacks for text-only sends too; only their routine successes are omitted.
 - Normalize unsupported static Discord images when possible, fall back to WhatsApp document delivery on failure, and precompute outbound JPEG thumbnails when tooling is available.
 - Send album-eligible image/video sets to ordinary WhatsApp chats as media albums; keep mixed or unsupported sets on the sequential fallback path.
 - Mirror WhatsApp view-once media as Discord spoiler attachments.
@@ -66,7 +71,7 @@ Managed forum hosts are selected by configured name and a bot-owner marker in th
 
 Treat newsletters as standard `sendMessage(...)` destinations where supported, with these exceptions:
 
-- Image/video attachments follow `NewsletterMediaUrlFallback`: send plain URLs when enabled; otherwise skip and explain the limitation.
+- Image/video attachments follow `NewsletterMediaUrlFallback`: send plain URLs when enabled; otherwise upload media through newsletter-specific endpoints, with server thumbnails and the upload handle as the message stanza `media_id`. Keep handle tracking bounded and retry-safe, and keep newsletter media out of ordinary encrypted-media caches. Failed uploads retain the text/link fallback.
 - Other attachment types are skipped with a user-facing notice and the [WhatsApp newsletter-media guidance link](https://faq.whatsapp.com/549900560675125/).
 - Discord-originated newsletter edit/delete is not dispatched; remind the user to perform it in the phone app.
 - Pending outbound IDs are correlated with raw `live_updates` `server_id` values as early as possible.

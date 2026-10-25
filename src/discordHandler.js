@@ -16,10 +16,12 @@ import {
 	NEWSLETTER_ACK_WAIT_WITHOUT_SERVER_ID_MS,
 	NEWSLETTER_SERVER_ID_WAIT_POLL_MS,
 	NEWSLETTER_SERVER_ID_WAIT_TIMEOUT_MS,
+	normalizeContactAvatarUrl,
 	ONE_WAY_MODES,
 	oneWayAllowsDiscordToWhatsApp,
 	oneWayAllowsWhatsAppToDiscord,
 } from "./contracts.js";
+import { ExpiringCache } from "./internal/expiringCache.js";
 import messageStore from "./messageStore.js";
 import {
 	getNewsletterAckError,
@@ -106,14 +108,18 @@ const newsletterAckWaitMsForSentMessage = (sentMessage) =>
 	getNewsletterServerIdFromMessage(sentMessage)
 		? NEWSLETTER_ACK_WAIT_WITH_SERVER_ID_MS
 		: NEWSLETTER_ACK_WAIT_WITHOUT_SERVER_ID_MS;
-const discordForwardContextCache = new Map();
-const discordForwardContextTimers = new Map();
-const discordMessageLocationCache = new Map();
-const discordMessageLocationTimers = new Map();
-const discordMessageLocationMissCache = new Map();
-const discordMessageLocationMissTimers = new Map();
-const quotedWhatsAppMessageLocationCache = new Map();
-const quotedWhatsAppMessageLocationTimers = new Map();
+const discordForwardContextCache = new ExpiringCache(
+	DISCORD_FORWARD_CONTEXT_TTL_MS,
+);
+const discordMessageLocationCache = new ExpiringCache(
+	DISCORD_MESSAGE_LOCATION_TTL_MS,
+);
+const discordMessageLocationMissCache = new ExpiringCache(
+	DISCORD_MESSAGE_LOCATION_MISS_TTL_MS,
+);
+const quotedWhatsAppMessageLocationCache = new ExpiringCache(
+	DISCORD_MESSAGE_LOCATION_TTL_MS,
+);
 let restartInProgress = false;
 const allowsWhatsAppToDiscord = () =>
 	oneWayAllowsWhatsAppToDiscord(state.settings.oneWay);
@@ -366,39 +372,11 @@ const clearPinExpiryNotice = (messageId) => {
 	}
 };
 
-const clearTimedCacheEntry = (cache, timers, key) => {
-	if (!key) return;
-	const normalizedKey = String(key);
-	const timer = timers.get(normalizedKey);
-	if (timer) {
-		clearTimeout(timer);
-		timers.delete(normalizedKey);
-	}
-	cache.delete(normalizedKey);
-};
-
-const setTimedCacheEntry = (cache, timers, key, value, ttlMs) => {
-	if (!key) return;
-	const normalizedKey = String(key);
-	clearTimedCacheEntry(cache, timers, normalizedKey);
-	cache.set(normalizedKey, value);
-	const timer = setTimeout(() => {
-		cache.delete(normalizedKey);
-		timers.delete(normalizedKey);
-	}, ttlMs);
-	timer?.unref?.();
-	timers.set(normalizedKey, timer);
-};
-
 const consumeForwardContext = (messageId) => {
 	if (!messageId) return null;
 	const normalizedId = String(messageId);
 	const context = discordForwardContextCache.get(normalizedId) || null;
-	clearTimedCacheEntry(
-		discordForwardContextCache,
-		discordForwardContextTimers,
-		normalizedId,
-	);
+	discordForwardContextCache.delete(normalizedId);
 	return context;
 };
 
@@ -536,18 +514,11 @@ const cacheDiscordMessageLocation = (message, fallbackChannelId = null) => {
 			? message.url
 			: buildDiscordMessageUrl({ guildId, channelId, messageId });
 	if (!channelId && !url) return;
-	clearTimedCacheEntry(
-		discordMessageLocationMissCache,
-		discordMessageLocationMissTimers,
-		messageId,
-	);
-	setTimedCacheEntry(
-		discordMessageLocationCache,
-		discordMessageLocationTimers,
-		messageId,
-		{ channelId: channelId || null, url: url || null },
-		DISCORD_MESSAGE_LOCATION_TTL_MS,
-	);
+	discordMessageLocationMissCache.delete(messageId);
+	discordMessageLocationCache.set(messageId, {
+		channelId: channelId || null,
+		url: url || null,
+	});
 };
 
 const getCachedQuotedWhatsAppMessageLocation = (
@@ -596,17 +567,11 @@ const cacheQuotedWhatsAppMessageLocation = ({
 			: null);
 	if (!channelId && !url && !normalizedDiscordId) return;
 
-	setTimedCacheEntry(
-		quotedWhatsAppMessageLocationCache,
-		quotedWhatsAppMessageLocationTimers,
-		normalizedWaId,
-		{
-			discordId: normalizedDiscordId || null,
-			channelId: channelId || null,
-			url: url || null,
-		},
-		DISCORD_MESSAGE_LOCATION_TTL_MS,
-	);
+	quotedWhatsAppMessageLocationCache.set(normalizedWaId, {
+		discordId: normalizedDiscordId || null,
+		channelId: channelId || null,
+		url: url || null,
+	});
 };
 
 const buildForwardContext = (message, rawContext = null) => {
@@ -827,13 +792,7 @@ const resolveForwardSourceFromQuote = async (message) => {
 		};
 	}
 
-	setTimedCacheEntry(
-		discordMessageLocationMissCache,
-		discordMessageLocationMissTimers,
-		mappedDiscordId,
-		true,
-		DISCORD_MESSAGE_LOCATION_MISS_TTL_MS,
-	);
+	discordMessageLocationMissCache.set(mappedDiscordId, true);
 	if (sourceChannelId) return { channelId: sourceChannelId, url: null };
 
 	return null;
@@ -1712,26 +1671,13 @@ client.on("whatsappDelete", async ({ id, jid }) => {
 	}
 	delete state.lastMessages[id];
 	delete state.lastMessages[messageId];
-	clearTimedCacheEntry(
-		quotedWhatsAppMessageLocationCache,
-		quotedWhatsAppMessageLocationTimers,
-		id,
-	);
-	clearTimedCacheEntry(
-		quotedWhatsAppMessageLocationCache,
-		quotedWhatsAppMessageLocationTimers,
-		messageId,
-	);
-	clearTimedCacheEntry(
-		discordMessageLocationCache,
-		discordMessageLocationTimers,
-		messageId,
-	);
-	clearTimedCacheEntry(
-		discordMessageLocationMissCache,
-		discordMessageLocationMissTimers,
-		messageId,
-	);
+	deliveredMessages.delete(messageId);
+	delete state.reactions[messageId];
+	clearPinExpiryNotice(messageId);
+	quotedWhatsAppMessageLocationCache.delete(id);
+	quotedWhatsAppMessageLocationCache.delete(messageId);
+	discordMessageLocationCache.delete(messageId);
+	discordMessageLocationMissCache.delete(messageId);
 });
 
 client.on("whatsappCall", async ({ call, jid }) => {
@@ -2341,7 +2287,78 @@ const waitForWhatsAppPairingReady = async (client) => {
 	});
 };
 
+const updateContactAvatar = async (ctx, reset = false) => {
+	const jid = await resolveUserJidOption(ctx, {
+		optionName: "contact",
+		description: "a contact",
+	});
+	if (!jid) return;
+	if (!/^\d+@(s\.whatsapp\.net|lid)$/.test(jid)) {
+		await ctx.reply("Please choose an individual WhatsApp contact.");
+		return;
+	}
+	const url = reset
+		? null
+		: normalizeContactAvatarUrl(ctx.getStringOption("url"));
+	if (!reset && !url) {
+		await ctx.reply(
+			"Please provide an HTTPS image URL without a username or password.",
+		);
+		return;
+	}
+	const [primary] = await utils.whatsapp.hydrateJidPair(jid);
+	const contactJid = primary || jid;
+	const previous = state.settings.CustomContactAvatars;
+	const avatars = { ...previous };
+	if (reset) delete avatars[contactJid];
+	else avatars[contactJid] = url;
+	state.settings.CustomContactAvatars = avatars;
+	try {
+		await storage.saveSettings();
+	} catch (err) {
+		state.settings.CustomContactAvatars = previous;
+		state.logger?.error?.({ err }, "Failed to save custom contact avatar");
+		await ctx.reply("Could not save the avatar. Please try again.");
+		return;
+	}
+	await ctx.reply(
+		reset
+			? "Custom avatar removed. Future messages will use the WhatsApp picture."
+			: "Custom avatar saved for this contact's future Discord messages.",
+	);
+};
+
 const commandHandlers = {
+	setavatar: {
+		description: "Set a WhatsApp contact's avatar in Discord.",
+		options: [
+			{
+				name: "contact",
+				description: "Contact name, number with country code, or JID.",
+				type: ApplicationCommandOptionType.String,
+				required: true,
+			},
+			{
+				name: "url",
+				description: "Stable HTTPS URL of the image to use.",
+				type: ApplicationCommandOptionType.String,
+				required: true,
+			},
+		],
+		execute: (ctx) => updateContactAvatar(ctx),
+	},
+	resetavatar: {
+		description: "Restore a WhatsApp contact's avatar in Discord.",
+		options: [
+			{
+				name: "contact",
+				description: "Contact name, number with country code, or JID.",
+				type: ApplicationCommandOptionType.String,
+				required: true,
+			},
+		],
+		execute: (ctx) => updateContactAvatar(ctx, true),
+	},
 	ping: {
 		description: "Check the bot latency.",
 		async execute(ctx) {
@@ -4966,12 +4983,11 @@ const commandHandlers = {
 	},
 	newsletterurlfallback: {
 		description:
-			"Toggle temporary URL fallback for newsletter image/video attachments.",
+			"Send newsletter image/video attachments as links instead of uploading them.",
 		options: [
 			{
 				name: "enabled",
-				description:
-					"Temporary Baileys workaround: send newsletter image/video attachments as plain links.",
+				description: "Send newsletter image/video attachments as plain links.",
 				type: ApplicationCommandOptionType.Boolean,
 				required: true,
 			},
@@ -4981,8 +4997,8 @@ const commandHandlers = {
 			state.settings.NewsletterMediaUrlFallback = enabled;
 			await ctx.reply(
 				enabled
-					? "Newsletter media URL fallback is enabled. This is a temporary workaround until upstream Baileys newsletter media posting is fixed. Image/video attachments will be sent as plain links."
-					: "Newsletter media URL fallback is disabled. Until upstream Baileys newsletter media posting is fixed, image/video attachments will not be sent to newsletters.",
+					? "Newsletter media URL fallback is enabled. Image/video attachments will be sent as plain links."
+					: "Newsletter media URL fallback is disabled. Image/video attachments will be uploaded to newsletters.",
 			);
 		},
 	},
@@ -5921,19 +5937,13 @@ client.on("raw", (packet = {}) => {
 		return;
 	}
 
-	setTimedCacheEntry(
-		discordForwardContextCache,
-		discordForwardContextTimers,
-		messageId,
-		{
-			isForwarded: hasForwardSignal,
-			sourceChannelId,
-			sourceMessageId,
-			sourceGuildId,
-			snapshot,
-		},
-		DISCORD_FORWARD_CONTEXT_TTL_MS,
-	);
+	discordForwardContextCache.set(messageId, {
+		isForwarded: hasForwardSignal,
+		sourceChannelId,
+		sourceMessageId,
+		sourceGuildId,
+		snapshot,
+	});
 });
 
 client.on("messageCreate", async (message) => {
@@ -6112,30 +6122,16 @@ client.on("messageUpdate", async (oldMessage, message) => {
 });
 
 client.on("messageDelete", async (message) => {
+	deliveredMessages.delete(message?.id);
+	delete state.reactions[message?.id];
+	clearPinExpiryNotice(message?.id);
+	discordMessageLocationCache.delete(message?.id);
+	discordMessageLocationMissCache.delete(message?.id);
+	quotedWhatsAppMessageLocationCache.delete(message?.id);
+	discordForwardContextCache.delete(message?.id);
 	if (!state.settings.DeleteMessages) {
 		return;
 	}
-
-	clearTimedCacheEntry(
-		discordMessageLocationCache,
-		discordMessageLocationTimers,
-		message?.id,
-	);
-	clearTimedCacheEntry(
-		discordMessageLocationMissCache,
-		discordMessageLocationMissTimers,
-		message?.id,
-	);
-	clearTimedCacheEntry(
-		quotedWhatsAppMessageLocationCache,
-		quotedWhatsAppMessageLocationTimers,
-		message?.id,
-	);
-	clearTimedCacheEntry(
-		discordForwardContextCache,
-		discordForwardContextTimers,
-		message?.id,
-	);
 
 	const jid = utils.discord.channelIdToJid(message.channelId);
 	if (jid == null) {
@@ -6164,11 +6160,7 @@ client.on("messageDelete", async (message) => {
 		}
 		for (const waId of normalizedWaIds) {
 			delete state.lastMessages[waId];
-			clearTimedCacheEntry(
-				quotedWhatsAppMessageLocationCache,
-				quotedWhatsAppMessageLocationTimers,
-				waId,
-			);
+			quotedWhatsAppMessageLocationCache.delete(waId);
 		}
 		delete state.lastMessages[message.id];
 		clearPinExpiryNotice(message.id);
@@ -6243,11 +6235,7 @@ client.on("messageDelete", async (message) => {
 	}
 	for (const waId of [...new Set([...normalizedWaIds, ...waIdsToDelete])]) {
 		delete state.lastMessages[waId];
-		clearTimedCacheEntry(
-			quotedWhatsAppMessageLocationCache,
-			quotedWhatsAppMessageLocationTimers,
-			waId,
-		);
+		quotedWhatsAppMessageLocationCache.delete(waId);
 	}
 	delete state.lastMessages[message.id];
 	clearPinExpiryNotice(message.id);

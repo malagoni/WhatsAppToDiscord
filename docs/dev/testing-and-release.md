@@ -15,9 +15,15 @@ Preferred checks before handoff:
 - `WA2DC_SMOKE_TEST=1 node src/index.js` for startup-sensitive changes
 - `npm run build:bin:smoke` when packaging or runtime-sidecar behavior changes
 
+`npm test` explicitly selects `tests/*.test.js`. This prevents Node's recursive discovery from running ignored local testing installations or duplicate snapshots. Add maintained test files directly under `tests/` with the `.test.js` suffix.
+
+The packaged smoke check removes its temporary working directory on both success and failure.
+
+For reproducible local performance comparisons, run `node scripts/benchmark.js` after both bundle commands, using the same supported Node version, dependencies, and host load for the baseline and candidate. The script uses synthetic temporary SQLite state, records five timing samples per workload, and measures source and ESM smoke startup. Database timings and process RSS are synthetic measurements, not live bridge throughput or end-to-end latency claims.
+
 The normal smoke mode skips external transports and exits itself, so it does not exercise signal handling. Process-lifecycle changes also require the focused shutdown tests, which inject stuck ingress, saves, reporters, and spawned/cluster workers to verify ordered persistence, validated supervisor IPC, source-aware duplicate coalescing, deliberate second-signal behavior, actual-child exit tracking, and watchdog `SIGKILL` escalation without using live credentials. Run source and packaged signal smoke with `WA2DC_SMOKE_TEST=1 WA2DC_SMOKE_WAIT_FOR_SIGNAL=1`, wait for the ready message, and send Ctrl-C; both watchdog and worker must exit. Crash-report queue tests verify bounded log-tail reads, private atomic writes, identical-content replacement safety, and failed-delivery recovery from claimed spool files.
 
-The `CI` workflow runs for pull requests and pushes to `main` and `next`. It validates Conventional Commit pull-request titles, runs Biome and documentation checks, and runs tests, the ESM bundle smoke test, and packaged smoke tests on Ubuntu, macOS Intel, and Windows. Superseded runs for the same pull request are cancelled. Release builds use Node.js 24 and must remain at or above the supported 24.15.0 floor.
+The `CI` workflow runs for pull requests and pushes to `main` and `next`. It validates Conventional Commit pull-request titles, runs Biome and documentation checks, and runs tests, the ESM bundle smoke test, and packaged smoke tests on Ubuntu, macOS Intel, and Windows. Superseded runs for the same pull request are cancelled. Release builds use Node.js 24 and must remain at or above the supported 24.22.1 floor.
 
 ## Branch and version policy
 
@@ -74,6 +80,7 @@ Keep these checks dependency-free and network-free. External links are verified 
 
 - `npm run bundle` bundles `src/runner.js` to ESM `out.js` for Node smoke checks.
 - `npm run bundle:pkg` bundles the same entry to pkg-safe CJS `out.cjs`; avoid base64 data-URL bootstraps that inflate packaged stacks and startup heap.
+- Both bundles remove whitespace and comments while preserving identifier names; generated artifacts remain disposable.
 - `@yao-pkg/pkg` is pinned by the build scripts/workflow and packages `out.cjs` with `--no-bytecode`.
 - Builds stage `build/runtime/` for `sharp`, `canvas`, `jsdom`, and `lottie-web`.
 - Release automation publishes a signed `${binary}.runtime.tar.gz` for every packaged binary.
@@ -84,17 +91,28 @@ Keep these checks dependency-free and network-free. External links are verified 
 - Cross-filesystem sidecar installation preserves relative symbolic-link targets instead of binding them to the temporary extraction directory.
 - `process.pkg` is the supported packaged/source runtime distinction.
 
+### Runtime security validation
+
+The build host's Node.js version and pkg's embedded Node.js version are independent. Before publishing a runtime security fix, check the generated executable's actual runtime and certificate behavior; a successful build or `--smoke` run does not establish that pkg fetched a patched runtime. Updating `actions/setup-node` alone does not establish that the embedded executable is patched. Apply the same checks to the final container image.
+
+If patched packaged artifacts are unavailable, the operator fallback is the documented [source installation conversion](../setup.md#move-a-packaged-installation-to-source) with a verified patched Node.js release and the same stable application tag. Describe this as a deployment workaround; a documentation update does not patch previously published executables or images.
+
 ## Baileys compatibility
 
 The repository currently pins Baileys `7.0.0-rc14` and patches it during `postinstall`. Release builds must run after the patch succeeds. Tests must cover each source replacement marker so an upstream package change fails installation visibly rather than producing a partially patched runtime.
 
 The current patch set covers:
 
+- newsletter image/video upload endpoints, thumbnail metadata, media attributes, and bounded retry-safe upload handles (upstream PRs [#2434](https://github.com/WhiskeySockets/Baileys/pull/2434) and [#2836](https://github.com/WhiskeySockets/Baileys/pull/2836))
+- obsolete WhatsApp Web/Desktop media-host fallback for direct-path downloads
+- media HTTP abort-signal forwarding, unused error-body cancellation, and decrypt/HTTP stream cleanup in both directions
 - Android browser-profile support
 - disabled-history startup buffering and receipt behavior while unavailable
-- pre-auth notification acknowledgements and incomplete link-code pairing notices
+- pre-auth notification acknowledgements, incomplete link-code pairing notices, and companion registration QR refresh
 - LID migration probes
 - bounded tctoken indexing/pruning
+
+QR registration refresh follows [upstream PR #2765](https://github.com/WhiskeySockets/Baileys/pull/2765): rotate the advertisement secret only for an unpaired QR session, persist it through `creds.update`, and re-render the current reference without advancing refs or resetting the timer. Never log pairing secrets or raw notification nodes.
 
 Fresh pairing prefers `fetchLatestWaWebVersion()` and falls back to `fetchLatestBaileysVersion()`. Keep the associated pairing regression tests and upstream issue references current when the pinned Baileys version changes.
 
@@ -102,4 +120,8 @@ Fresh pairing prefers `fetchLatestWaWebVersion()` and falls back to `fetchLatest
 
 When changing dependencies, verify ESM bundle, pkg CJS bundle, native/dynamic assets, and sidecar install/update/rollback paths. Packages with top-level `await`, runtime filesystem lookup, or native addons require explicit packaged verification.
 
+Discord REST intentionally uses Undici 6 through the `undici6` alias and the matching `discord.js` / `@discordjs/rest` overrides. Keep those on the same patched 6.x version while updating the application's Undici 7 independently. The Baileys `music-metadata` override must include malformed-media security fixes while retaining the bundling-compatible `file-type` override. Audit every installed copy, including transitive dependencies and the generated runtime sidecar.
+
 Generated `out.js`, `out.cjs`, and `build/` artifacts must not be edited or committed manually.
+
+The Docker build context is an allowlist of runtime source, package manifests, the license, entrypoint, and Baileys postinstall patch. Tests, local testing installations, logs, storage, generated bundles, and release tooling stay outside the context and final runtime layer.

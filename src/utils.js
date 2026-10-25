@@ -32,6 +32,7 @@ import {
 	createDiscordWebhookClient,
 } from "./clientFactories.js";
 import { getImageSharp } from "./imageLibs.js";
+import { readStreamToBuffer } from "./internal/attachmentBuffer.js";
 import { createWhatsAppAudioToDiscordFileNormalizer } from "./internal/whatsappAudioToDiscordNormalization.js";
 import {
 	isLazyWhatsAppDiscordAttachment,
@@ -3246,11 +3247,11 @@ const discord = {
 				const staged = await stageWhatsAppDiscordAttachments(incomingFiles, {
 					download:
 						internalOptions.downloadWhatsAppMedia ||
-						((file) =>
+						((file, { signal }) =>
 							downloadMediaMessage(
 								file.downloadCtx,
 								"stream",
-								{},
+								{ options: { signal } },
 								{
 									logger: state.logger,
 									reuploadRequest: state.waClient?.updateMediaMessage,
@@ -3430,7 +3431,8 @@ const discord = {
 				level,
 				{ attemptNumber, durationMs, outcome, error },
 			) => {
-				if (!initialAttachmentCount) return;
+				// Text-only successes are routine; their failures and fallbacks are not.
+				if (!initialAttachmentCount && outcome === "success") return;
 				const rawErrorCode = String(error?.code || error?.name || "");
 				const errorCode = rawErrorCode
 					.replace(/[^a-zA-Z0-9_-]/gu, "")
@@ -3446,7 +3448,9 @@ const discord = {
 						outcome,
 						...(errorCode ? { errorCode } : {}),
 					},
-					"Discord webhook attachment upload attempt completed.",
+					initialAttachmentCount
+						? "Discord webhook attachment upload attempt completed."
+						: "Discord webhook send attempt completed.",
 				);
 			};
 
@@ -3984,18 +3988,22 @@ const discord = {
 		} catch {
 			return;
 		}
-		const files = await Promise.all(
-			entries.map(async (name) => {
-				const filePath = path.resolve(resolvedDownloadDir, name);
-				try {
-					const stat = await fs.promises.stat(filePath);
-					if (!stat.isFile()) return null;
-					return { filePath, mtime: stat.mtimeMs, size: stat.size };
-				} catch {
-					return null;
-				}
-			}),
-		);
+		const files = [];
+		for (let offset = 0; offset < entries.length; offset += 32) {
+			const batch = await Promise.all(
+				entries.slice(offset, offset + 32).map(async (name) => {
+					const filePath = path.resolve(resolvedDownloadDir, name);
+					try {
+						const stat = await fs.promises.stat(filePath);
+						if (!stat.isFile()) return null;
+						return { filePath, mtime: stat.mtimeMs, size: stat.size };
+					} catch {
+						return null;
+					}
+				}),
+			);
+			files.push(...batch);
+		}
 		let validFiles = files.filter(Boolean).sort((a, b) => a.mtime - b.mtime);
 
 		const deleteFile = async (file) => {
@@ -4289,6 +4297,7 @@ const whatsapp = {
 		migrateKey(state.contacts);
 		migrateKey(state.goccRuns);
 		migrateKey(state.settings?.WhatsAppDiscordMentionLinks);
+		migrateKey(state.settings?.CustomContactAvatars);
 		const whitelist = state.settings?.Whitelist;
 		if (Array.isArray(whitelist) && whitelist.length) {
 			const normalized = whitelist.map((jid) => {
@@ -4979,67 +4988,44 @@ const whatsapp = {
 					spoiler: viewOnce,
 				};
 			}
-			if (nMsgType === "videoMessage" && msg.gifPlayback) {
-				const attachmentBuffer = Buffer.from(
-					await downloadMediaMessage(
-						rawMsg,
-						"buffer",
-						{},
-						{
-							logger: state.logger,
-							reuploadRequest: state.waClient.updateMediaMessage,
-						},
-					),
-				);
-				const normalizedGif = await normalizeWhatsAppGifFileForDiscord({
-					attachmentBuffer,
-					fileName: baseName,
-					mimetype: msg.mimetype,
-					jid: remoteJid,
-					messageId: this.getId(rawMsg),
-				});
-				return {
-					name: viewOnce
-						? asDiscordSpoilerFileName(normalizedGif.fileName)
-						: normalizedGif.fileName,
-					attachment: normalizedGif.attachmentBuffer,
-					contentType: normalizedGif.contentType,
-					largeFile,
-					downloadCtx: rawMsg,
-					msgType: nMsgType,
-					spoiler: viewOnce,
-				};
-			}
-			if (
+			const isGif = nMsgType === "videoMessage" && msg.gifPlayback;
+			const convertAudio =
 				nMsgType === "audioMessage" &&
-				state.settings.WhatsAppAudioConversionFormat === "mp3"
-			) {
-				const attachmentBuffer = Buffer.from(
-					await downloadMediaMessage(
-						rawMsg,
-						"buffer",
-						{},
-						{
-							logger: state.logger,
-							reuploadRequest: state.waClient.updateMediaMessage,
-						},
-					),
+				state.settings.WhatsAppAudioConversionFormat === "mp3";
+			if (isGif || convertAudio) {
+				const stream = await downloadMediaMessage(
+					rawMsg,
+					"stream",
+					{ options: { signal: AbortSignal.timeout(60_000) } },
+					{
+						logger: state.logger,
+						reuploadRequest: state.waClient.updateMediaMessage,
+					},
 				);
-				const normalizedAudio = await normalizeWhatsAppAudioFileForDiscord({
+				const attachmentBuffer = await readStreamToBuffer(
+					stream,
+					state.settings.DiscordFileSizeLimit,
+				);
+				const options = {
 					attachmentBuffer,
 					fileName: baseName,
 					mimetype: msg.mimetype,
-					targetFormat: state.settings.WhatsAppAudioConversionFormat,
 					jid: remoteJid,
 					messageId: this.getId(rawMsg),
 					maxBytes: state.settings.DiscordFileSizeLimit,
-				});
+				};
+				const normalized = isGif
+					? await normalizeWhatsAppGifFileForDiscord(options)
+					: await normalizeWhatsAppAudioFileForDiscord({
+							...options,
+							targetFormat: "mp3",
+						});
 				return {
 					name: viewOnce
-						? asDiscordSpoilerFileName(normalizedAudio.fileName)
-						: normalizedAudio.fileName,
-					attachment: normalizedAudio.attachmentBuffer,
-					contentType: normalizedAudio.contentType,
+						? asDiscordSpoilerFileName(normalized.fileName)
+						: normalized.fileName,
+					attachment: normalized.attachmentBuffer,
+					contentType: normalized.contentType,
 					largeFile,
 					downloadCtx: rawMsg,
 					msgType: nMsgType,
@@ -5056,6 +5042,19 @@ const whatsapp = {
 				wa2dcLazyWhatsAppMedia: true,
 			};
 		} catch (err) {
+			if (err?.code === "WA2DC_ATTACHMENT_TOO_LARGE") {
+				if (!state.settings.LocalDownloads) return -1;
+				const spoiler = isWhatsAppViewOnceMediaMessage(rawMsg, msgType, msg);
+				const name = this.getFilename(msg, nMsgType);
+				return {
+					name: spoiler ? asDiscordSpoilerFileName(name) : name,
+					downloadCtx: rawMsg,
+					declaredSize: fileLength,
+					msgType: nMsgType,
+					largeFile: true,
+					spoiler,
+				};
+			}
 			if (
 				err?.message?.includes("Unrecognised filter type") ||
 				err?.message?.includes("Unrecognized filter type")
@@ -5120,6 +5119,8 @@ const whatsapp = {
 	_profilePicsCache: {},
 	async getProfilePic(rawMsg) {
 		const jid = await this.getSenderJid(rawMsg, rawMsg?.key?.fromMe);
+		const customAvatar = state.settings.CustomContactAvatars?.[jid];
+		if (customAvatar) return customAvatar;
 		if (this._profilePicsCache[jid] === undefined) {
 			this._profilePicsCache[jid] = await state.waClient
 				.profilePictureUrl(jid, "preview")

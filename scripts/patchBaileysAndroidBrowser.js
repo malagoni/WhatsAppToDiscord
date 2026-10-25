@@ -314,6 +314,206 @@ const skipIncompleteLinkCodePairingAfter = `            case 'link_code_companio
                 const primaryEphemeralPublicKeyWrapped = toRequiredBuffer(requiredPairingBuffers.link_code_pairing_wrapped_primary_ephemeral_pub);`;
 
 const replacements = [
+	// Backport the QR refresh flow from Baileys PR #2765 without spending another ref.
+	{
+		file: "lib/Socket/socket.js",
+		before: `    // QR gen
+    ws.on('CB:iq,type:set,pair-device', async (stanza) => {`,
+		after: `    let refreshPairingQR;
+    ws.on('CB:notification,type:companion_reg_refresh', (node) => {
+        if (creds.me || !ws.isOpen || !refreshPairingQR) return;
+        if (!getBinaryNodeChild(node, 'companion_reg_refresh') && !getBinaryNodeChild(node, 'pair-device-rotate-qr')) return;
+        creds.advSecretKey = randomBytes(32).toString('base64');
+        ev.emit('creds.update', { advSecretKey: creds.advSecretKey });
+        refreshPairingQR();
+    });
+    // QR gen
+    ws.on('CB:iq,type:set,pair-device', async (stanza) => {`,
+	},
+	{
+		file: "lib/Socket/socket.js",
+		before: `        const advB64 = creds.advSecretKey;`,
+		after: `        let currentPairingRef;
+        refreshPairingQR = () => {
+            const qr = buildPairingQRData(currentPairingRef, noiseKeyB64, identityKeyB64, creds.advSecretKey, browser);
+            ev.emit('connection.update', { qr });
+        };`,
+	},
+	{
+		file: "lib/Socket/socket.js",
+		before: `            const ref = refNode.content.toString('utf-8');
+            const qr = buildPairingQRData(ref, noiseKeyB64, identityKeyB64, advB64, browser);
+            ev.emit('connection.update', { qr });`,
+		after: `            currentPairingRef = refNode.content.toString('utf-8');
+            refreshPairingQR();`,
+	},
+	// Backport newsletter image/video uploads from Baileys PRs #2434 and #2836.
+	{
+		file: "lib/Utils/messages-media.js",
+		before: `export const getWAUploadToServer =`,
+		after: `// Retry-safe, bounded upload handles; never shared with ordinary media caches.
+const newsletterMediaHandles = new Map();
+export const rememberNewsletterMediaHandle = (directPath, handle) => {
+    if (!directPath || !handle) return;
+    newsletterMediaHandles.delete(directPath);
+    newsletterMediaHandles.set(directPath, { handle, expiresAt: Date.now() + 600_000 });
+    if (newsletterMediaHandles.size > 256) newsletterMediaHandles.delete(newsletterMediaHandles.keys().next().value);
+};
+export const getNewsletterMediaHandle = (directPath) => {
+    const entry = newsletterMediaHandles.get(directPath);
+    if (entry?.expiresAt > Date.now()) return entry.handle;
+    newsletterMediaHandles.delete(directPath);
+};
+export const getWAUploadToServer =`,
+	},
+	{
+		file: "lib/Utils/messages-media.js",
+		before: `return async (filePath, { mediaType, fileEncSha256B64, timeoutMs }) => {`,
+		after: `return async (filePath, { mediaType, fileEncSha256B64, timeoutMs, newsletter }) => {`,
+	},
+	{
+		file: "lib/Utils/messages-media.js",
+		before: `const url = \`https://\${hostname}\${MEDIA_PATH_MAP[mediaType]}/\${fileEncSha256B64}?auth=\${auth}&token=\${fileEncSha256B64}\`;`,
+		after: `const mediaPath = newsletter ? \`/newsletter/newsletter-\${mediaType === 'sticker' ? 'image' : mediaType}\` : MEDIA_PATH_MAP[mediaType];
+            const url = \`https://\${hostname}\${mediaPath}/\${fileEncSha256B64}?auth=\${auth}&token=\${fileEncSha256B64}\${newsletter ? '&server_thumb_gen=1' + (mediaType === 'video' ? '&server_transcode=1' : '') : ''}\`;`,
+	},
+	{
+		file: "lib/Utils/messages-media.js",
+		before: `                        ts: result.ts`,
+		after: `                        ts: result.ts,
+                        handle: result.handle,
+                        thumbnailDirectPath: result.thumbnail_info?.thumbnail_direct_path,
+                        thumbnailSha256: result.thumbnail_info?.thumbnail_sha256`,
+	},
+	{
+		file: "lib/Utils/messages.js",
+		before: `getRawMediaUploadData }`,
+		after: `getRawMediaUploadData, rememberNewsletterMediaHandle }`,
+	},
+	{
+		file: "lib/Utils/messages.js",
+		before: `    if (cacheableKey) {
+        const mediaBuff`,
+		after: `    const isNewsletter = !!options.jid && isJidNewsletter(options.jid);
+    if (cacheableKey && !isNewsletter) {
+        const mediaBuff`,
+	},
+	{
+		file: "lib/Utils/messages.js",
+		before: `    const isNewsletter = !!options.jid && isJidNewsletter(options.jid);
+    if (isNewsletter) {
+        logger?.info({ key: cacheableKey }, 'Preparing raw media for newsletter');
+        const { filePath, fileSha256, fileLength } = await getRawMediaUploadData(uploadData.media, options.mediaTypeOverride || mediaType, logger);
+        const fileSha256B64 = fileSha256.toString('base64');
+        const { mediaUrl, directPath } = await options.upload(filePath, {
+            fileEncSha256B64: fileSha256B64,
+            mediaType: mediaType,
+            timeoutMs: options.mediaUploadTimeoutMs
+        });
+        await fs.unlink(filePath);
+        const obj = WAProto.Message.fromObject({
+            // todo: add more support here
+            [\`\${mediaType}Message\`]: MessageTypeProto[mediaType].fromObject({
+                url: mediaUrl,
+                directPath,
+                fileSha256,
+                fileLength,
+                ...uploadData,
+                media: undefined
+            })
+        });
+        if (uploadData.ptv) {
+            obj.ptvMessage = obj.videoMessage;
+            delete obj.videoMessage;
+        }
+        if (obj.stickerMessage) {
+            obj.stickerMessage.stickerSentTs = Date.now();
+        }
+        if (cacheableKey) {
+            logger?.debug({ cacheableKey }, 'set cache');
+            await options.mediaCache.set(cacheableKey, WAProto.Message.encode(obj).finish());
+        }
+        return obj;
+    }
+`,
+		after: `    if (isNewsletter) {
+        const { filePath, fileSha256, fileLength } = await getRawMediaUploadData(uploadData.media, options.mediaTypeOverride || mediaType, logger);
+        try {
+            const { directPath, handle, thumbnailDirectPath, thumbnailSha256 } = await options.upload(filePath, {
+                fileEncSha256B64: fileSha256.toString('base64'),
+                mediaType,
+                timeoutMs: options.mediaUploadTimeoutMs,
+                newsletter: true
+            });
+            rememberNewsletterMediaHandle(directPath, handle);
+            const obj = WAProto.Message.fromObject({
+                [\`\${mediaType}Message\`]: {
+                    ...uploadData,
+                    directPath,
+                    fileSha256,
+                    fileLength,
+                    thumbnailDirectPath,
+                    thumbnailSha256: thumbnailSha256 ? Buffer.from(thumbnailSha256, 'base64') : undefined,
+                    media: undefined
+                }
+            });
+            if (uploadData.ptv) {
+                obj.ptvMessage = obj.videoMessage;
+                delete obj.videoMessage;
+            }
+            if (obj.stickerMessage) obj.stickerMessage.stickerSentTs = Date.now();
+            return obj;
+        } finally {
+            await fs.unlink(filePath);
+        }
+    }
+`,
+	},
+	{
+		file: "lib/Socket/messages-send.js",
+		before: `import { Boom }`,
+		after: `import { getNewsletterMediaHandle } from '../Utils/messages-media.js';
+import { Boom }`,
+	},
+	{
+		file: "lib/Socket/messages-send.js",
+		before: `            const mediaType = getMediaType(message);`,
+		after: `            const innerMessage = normalizeMessageContent(message) || message;
+            const mediaType = getMediaType(innerMessage);`,
+	},
+	{
+		file: "lib/Socket/messages-send.js",
+		before: `                const bytes = encodeNewsletterMessage(patched);`,
+		after: `                const mediaHandle = getNewsletterMediaHandle((innerMessage.imageMessage || innerMessage.videoMessage)?.directPath);
+                const bytes = encodeNewsletterMessage(patched);`,
+	},
+	{
+		file: "lib/Socket/messages-send.js",
+		before: `                    tag: 'plaintext',
+                    attrs: {},`,
+		after: `                    tag: 'plaintext',
+                    attrs: extraAttrs,`,
+	},
+	{
+		file: "lib/Socket/messages-send.js",
+		before: `                        type: getMessageType(message),
+                        ...(additionalAttributes || {})`,
+		after: `                        type: getMessageType(innerMessage),
+                        ...(mediaHandle ? { media_id: mediaHandle } : {}),
+                        ...(additionalAttributes || {})`,
+	},
+	{
+		file: "lib/Utils/messages-media.js",
+		before: `    // Fallback host: explicit opt > host parsed from \`url\` > DEF_MEDIA_HOST.
+    // Lets us honor a non-default host carried by the proto without forcing callers to thread it through.
+    const fallbackHost = opts.host ?? extractHost(url);`,
+		after: `    // Web/Desktop stickers may carry obsolete URL hosts alongside a valid directPath.
+    // Preserve explicit overrides and other media hosts.
+    const urlHost = extractHost(url);
+    const fallbackHost = opts.host ?? (
+        urlHost === 'a.whatsapp.net' || urlHost === 'web.whatsapp.net' ? DEF_MEDIA_HOST : urlHost
+    );`,
+	},
 	{
 		file: "lib/Utils/browser-utils.js",
 		before:
@@ -440,6 +640,32 @@ const replacements = [
 		marker: "buildAckStanza(node, errorCode, authState.creds.me?.id)",
 		before: toleratePreAuthNotificationAckBefore,
 		after: toleratePreAuthNotificationAckAfter,
+	},
+	{
+		file: "lib/Utils/messages-media.js",
+		before: "import { Readable, Transform } from 'stream';",
+		after: "import { pipeline, Readable, Transform } from 'stream';",
+	},
+	{
+		file: "lib/Utils/messages-media.js",
+		before: `        dispatcher: options.dispatcher,
+        method: 'GET',`,
+		after: `        dispatcher: options.dispatcher,
+        signal: options.signal,
+        method: 'GET',`,
+	},
+	{
+		file: "lib/Utils/messages-media.js",
+		before: `        throw new Boom(\`Failed to fetch stream from \${url}\`, { statusCode: response.status, data: { url } });`,
+		after: `        if (response.body instanceof Readable) response.body.destroy();
+        else await response.body?.cancel().catch(() => {});
+        throw new Boom(\`Failed to fetch stream from \${url}\`, { statusCode: response.status, data: { url } });`,
+	},
+	{
+		file: "lib/Utils/messages-media.js",
+		before: "    return fetched.pipe(output, { end: true });",
+		after: `    pipeline(fetched, output, () => {});
+    return output;`,
 	},
 ];
 

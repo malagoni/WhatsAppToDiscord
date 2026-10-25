@@ -12,6 +12,8 @@ WhatsApp can require a socket restart immediately after successful pairing. WA2D
 
 Scan the next fresh QR code or rerun `/pairwithcode` only after WA2DC posts a new pairing prompt. WA2DC prefers WhatsApp's current Web revision and falls back to Baileys' published revision when the live lookup is unavailable. This works around the upstream [Baileys pairing-version issue](https://github.com/WhiskeySockets/Baileys/issues/2679).
 
+When WhatsApp refreshes a pending registration, WA2DC posts a replacement QR with a fresh registration secret. Scan the newest QR in the control channel. Existing linked sessions are unaffected.
+
 ### `/pairwithcode` causes a restart
 
 Fresh sessions use the Android browser profile for view-once support. Pairing codes can be more reliable under a Chrome profile, so WA2DC may store a temporary pairing profile, clear only the unregistered auth stub, and restart. Run `/pairwithcode` again after the new prompt.
@@ -86,6 +88,8 @@ Run `/waaudiomp3 enabled:true` and install `ffmpeg`. If conversion is unavailabl
 
 WhatsApp represents GIF playback as a video payload. WA2DC uses `ffmpeg` to create a real Discord GIF when available and otherwise sends the original video.
 
+If the converted GIF exceeds Discord's upload limit, WA2DC also keeps the original video. Conversion downloads use the same size limit and 60-second deadline as other WhatsApp attachments; oversized input follows your local-download settings.
+
 ### A Discord image arrives as a file
 
 WA2DC uses `sharp` to normalize unsupported static images. If the runtime sidecar is missing or the image cannot be decoded safely, it falls back to a document rather than dropping it.
@@ -93,6 +97,10 @@ WA2DC uses `sharp` to normalize unsupported static images. If the runtime sideca
 ### A Discord sticker is not converted
 
 Static and animated conversion depends on packaged runtime modules such as `sharp`, `canvas`, `jsdom`, and `lottie-web`. Keep the packaged `runtime/` sidecar beside the executable or allow signed bootstrap to restore it.
+
+### Some WhatsApp stickers fail to download for Discord
+
+Older releases can fail on stickers sent from WhatsApp Web/Desktop because their download metadata uses an obsolete WhatsApp host. Upgrade to a release containing the [sticker download fix](https://github.com/arespawn/WhatsAppToDiscord/issues/321). If downloads still fail, check the staging warning in `logs.txt`; `causeErrorCode` can identify a network failure without exposing the media URL. An attachment that uploads but displays “Image failed to load” may have a separate format problem.
 
 ### View-once media behavior
 
@@ -134,4 +142,4 @@ In-app self-update is supported for Linux x64, Linux ARM64, macOS Intel, and Win
 
 ### How do I build a binary?
 
-Install Node.js 24.15.0–24.x or 26.0.0 and newer, run `npm ci`, then `npm run build:bin`. Output is written to `build/`, including the executable and `runtime/` sidecar. `npm run build:bin:smoke` also runs the packaged smoke test. Full packaging constraints live in [Testing and Release](dev/testing-and-release.md).
+Install Node.js 24.22.1–24.x or 26.12.1 and newer, run `npm ci`, then `npm run build:bin`. Output is written to `build/`, including the executable and `runtime/` sidecar. `npm run build:bin:smoke` also runs the packaged smoke test. Full packaging constraints live in [Testing and Release](dev/testing-and-release.md).

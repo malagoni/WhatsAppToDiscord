@@ -21,6 +21,7 @@ WA2DC does not change `.env` permissions. Restrict it to the runtime account, fo
 | `WA2DC_UPDATE_CHANNEL` | Chooses release notifications | `stable`; use `unstable` for prereleases |
 | `WA2DC_KEEP_OLD_BINARY` | Forces retention of the previous packaged executable for rollback | Set to `1`; packaged installs normally retain rollback data through the persisted default |
 | `WA2DC_LOG_LEVEL` | Sets watchdog and worker Pino verbosity | `info`; valid values are `trace`, `debug`, `info`, `warn`, `error`, `fatal`, and `silent` |
+| `WA2DC_TLS_TRUST_CHECK` | Runs anonymous certificate-rejection and HTTPS positive-control checks, then exits before opening storage or starting the bridge | Unset; set to `1` when launching the watchdog entry point or packaged executable. See [TLS validation](dev/security-and-privacy.md#temporary-application-distrust) for the contacted hosts and output |
 | `WA2DC_WHATSAPP_BROWSER` | Advanced WhatsApp browser-profile override | `android`; supported values are `android`, `macos-chrome`, `windows-chrome`, `ubuntu-chrome`, and `baileys` |
 
 `WA2DC_WHATSAPP_BROWSER` is mainly a pairing or startup diagnostic. Changing profiles for an existing registered session can clear WhatsApp authentication and require pairing again.
@@ -32,10 +33,11 @@ An encrypted database exits at startup if its passphrase is missing or wrong. Ba
 - New WhatsApp chats create regular Discord channels. `/defaultchat` can switch to managed forum threads.
 - Bridging is bidirectional. `/oneway` can restrict it to WhatsApp → Discord or Discord → WhatsApp.
 - An empty whitelist permits every linked chat. Adding entries restricts bridging to those chats.
-- Discord attachments upload to WhatsApp by default; Discord embeds do not.
+- Discord attachments upload to WhatsApp by default; Discord embeds do not. Newsletter image/video attachments also upload as media; `/newsletterurlfallback enabled:true` switches them to plain links.
 - WhatsApp audio stays in its original format unless `/waaudiomp3 enabled:true` is selected.
 - WhatsApp media uploads to Discord use batches of 10 attachments. WA2DC stages them sequentially in a private operating-system temporary directory so retries can replay the same files, then removes the batch after delivery or fallback.
 - Mirrored deletions and public read-receipt notifications are enabled.
+- Contact avatars come from WhatsApp by default. `/setavatar` stores a custom HTTPS image URL for a contact; `/resetavatar` removes it.
 - Local downloads, the local download server, HTTPS, and download pruning are disabled.
 - The local download server defaults to `127.0.0.1:8080` and generates `localhost` URLs.
 - Update notifications follow the stable channel.

@@ -8,6 +8,10 @@
 
 Persistent app and WhatsApp authentication state lives in `storage/wa2dc.sqlite`, opened through Node's embedded SQLite API in WAL mode. Legacy flat-file storage is not loaded or migrated, and files such as `storage/settings` or `storage/contacts` do not exist in the current contract.
 
+Fixed SQL statements are prepared lazily and reused only for the lifetime of that database connection. Closing the store, including after failed encryption setup, releases the statement cache before another initialization. Statement reuse changes no tables, payload formats, encryption envelopes, or pruning rules.
+
+Each Baileys auth-key batch commits its writes and deletions in one SQLite transaction; failure rolls back the whole batch. Existing raw read/write/delete methods remain available. Message-store capacity pruning calculates overflow inside the deletion statement, preserving oldest-first ordering and exact capacity without materializing a count result in JavaScript.
+
 Table responsibilities:
 
 - `meta`: storage/encryption metadata
@@ -15,6 +19,8 @@ Table responsibilities:
 - `auth_creds`: the single serialized Baileys credential record
 - `auth_keys`: serialized Baileys Signal/auth namespaces keyed by logical filename
 - `message_store`: TTL-cached message payloads used by edits, polls, pins, newsletter flows, and related lookups
+
+`CustomContactAvatars` is a settings map from normalized individual-contact PN/LID JIDs to HTTPS image URLs. It is saved immediately by `/setavatar` and `/resetavatar`, follows identity migrations, and is included in SQLite backups/encryption. Images are not downloaded or persisted locally.
 
 `src/contracts.js` owns settings defaults and normalization. `src/chatLinks.js` accepts object records with webhook `channelId` and optional `threadId`; unsupported legacy channel-string records are ignored. `src/messageStore.js` bounds cached entries and prunes expired/old records.
 
@@ -28,7 +34,7 @@ On `SIGINT` or `SIGTERM`, WA2DC blocks reconnect work, independently quiesces do
 
 `WA2DC_DB_PASSPHRASE` enables encryption of stored payload values when present at first database creation. The metadata needed to identify/derive the encrypted format remains readable. Setting a passphrase for an existing unencrypted database is ignored rather than silently converting it.
 
-An encrypted database fails startup when the passphrase is missing or wrong. There is no recovery path without the original passphrase and a valid database backup.
+An encrypted database fails startup when the passphrase is missing or wrong. The store closes its handle on that failure, so a later `init()` in the same process fails the same way instead of reusing the open database with encryption disabled. There is no recovery path without the original passphrase and a valid database backup.
 
 ## Runtime artifacts
 
@@ -51,6 +57,7 @@ Packaged-install artifacts beside the executable:
 
 Update archives and extraction directories are created under the operating-system temporary directory and cleaned on success/failure paths.
 WhatsApp attachments bound for Discord are also staged under the operating-system temporary directory before upload. Each upload batch gets a private directory; files remain only through Discord retries and are removed on success, fallback, failure, or graceful shutdown.
+Outbound newsletter media uses temporary raw upload files, removed after upload success or failure. Upload handles stay in memory for at most ten minutes of reuse, capped at 256 entries; they are never persisted.
 Runtime sidecar archives contain only relative symbolic links that resolve inside `runtime/`; cross-filesystem installation preserves those links when moving the extracted sidecar beside the executable.
 
 Changing the location, lifecycle, format, or meaning of any artifact requires updates here and in public configuration/troubleshooting docs.
